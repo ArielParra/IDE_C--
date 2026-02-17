@@ -6,6 +6,7 @@ use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
 
+//Create a new file by clearing the buffer and resetting the current file path
 pub fn new_file(
     buffer: &gtk::TextBuffer,
     current_file: Rc<RefCell<Option<PathBuf>>>,
@@ -14,6 +15,7 @@ pub fn new_file(
     *current_file.borrow_mut() = None;
 }
 
+//Open a file dialog to select a file, read its contents, and display it in the text buffer
 pub fn open_file_dialog(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
@@ -43,6 +45,7 @@ pub fn open_file_dialog(
     );
 }
 
+//Save the CURRENT file if it exists, otherwise open a save dialog to create a new file
 pub fn save_file(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
@@ -61,6 +64,8 @@ pub fn save_file(
     }
 }
 
+
+//Open a save dialog to select a location and filename, then save the contents of the text buffer to that file and update the current file path
 pub fn save_as_file_dialog(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
