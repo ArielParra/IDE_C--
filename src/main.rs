@@ -1,21 +1,102 @@
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow};
+use gtk::{
+    Application, ApplicationWindow, Box, Orientation,
+    TextView, ScrolledWindow, PopoverMenuBar, gio};
+
+mod file_manager;
 
 fn main() {
     let app = Application::builder()
-        .application_id("com.ejemplo.MiApp")
+        .application_id("com.ide_cmm.ide")
         .build();
 
-    app.connect_activate(|app| {
-        let window = ApplicationWindow::builder()
-            .application(app)
-            .title("Mi primera app GTK en Rust")
-            .default_width(400)
-            .default_height(200)
-            .build();
-
-        window.present();
-    });
-
+    app.connect_activate(build_ui);
     app.run();
+}
+
+fn build_ui(app: &Application) {
+    let window = ApplicationWindow::builder()
+        .application(app)
+        .title("IDE_C--")
+        .default_width(900)
+        .default_height(600)
+        .build();
+
+    let vbox = Box::new(Orientation::Vertical, 0);
+
+    // === Text Editor ===
+    let text_view = TextView::new();
+    let buffer = text_view.buffer();
+
+    let scrolled = ScrolledWindow::builder()
+        .child(&text_view)
+        .vexpand(true)
+        .hexpand(true)
+        .build();
+
+    // === Menu ===
+    let menu_model = gio::Menu::new();
+
+    let file_menu = gio::Menu::new();
+    file_menu.append(Some("New"), Some("app.new"));
+    file_menu.append(Some("Open"), Some("app.open"));
+    file_menu.append(Some("Save"), Some("app.save"));
+    file_menu.append(Some("Save As"), Some("app.save_as"));
+    file_menu.append(Some("Exit"), Some("app.exit"));
+
+    menu_model.append_submenu(Some("File"), &file_menu);
+
+    let menubar = PopoverMenuBar::from_model(Some(&menu_model));
+
+    vbox.append(&menubar);
+    vbox.append(&scrolled);
+
+    window.set_child(Some(&vbox));
+
+    // === Actions ===
+
+    // NEW
+    let buffer_clone = buffer.clone();
+    let new_action = gio::SimpleAction::new("new", None);
+    new_action.connect_activate(move |_, _| {
+        file_manager::file_ops::new_file(&buffer_clone);
+    });
+    app.add_action(&new_action);
+
+    // OPEN
+    let window_clone = window.clone();
+    let buffer_clone = buffer.clone();
+    let open_action = gio::SimpleAction::new("open", None);
+    open_action.connect_activate(move |_, _| {
+        file_manager::file_ops::open_file_dialog(&window_clone, buffer_clone.clone());
+    });
+    app.add_action(&open_action);
+
+    // SAVE
+    let window_clone = window.clone();
+    let buffer_clone = buffer.clone();
+    let save_action = gio::SimpleAction::new("save", None);
+    save_action.connect_activate(move |_, _| {
+        file_manager::file_ops::open_file_dialog(&window_clone, buffer_clone.clone());
+    });
+    app.add_action(&save_action);
+
+    // SAVE AS
+    let window_clone = window.clone();
+    let buffer_clone = buffer.clone();
+    let save_as_action = gio::SimpleAction::new("save_as", None);
+    save_as_action.connect_activate(move |_, _| {
+        file_manager::file_ops::save_file_dialog(&window_clone, buffer_clone.clone());
+    });
+    app.add_action(&save_as_action);
+
+    // EXIT
+    let app_clone = app.clone();
+    let exit_action = gio::SimpleAction::new("exit", None);
+    exit_action.connect_activate(move |_, _| {
+        app_clone.quit();
+    });
+    app.add_action(&exit_action);
+
+    window.present();
 }
