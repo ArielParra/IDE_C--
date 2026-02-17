@@ -1,8 +1,10 @@
 use gtk::prelude::*;
 use gtk::{
     Application, ApplicationWindow, Box, Orientation,
-    TextView, ScrolledWindow,
+    ScrolledWindow,
 };
+use sourceview5::{View, Buffer};
+use sourceview5::prelude::ViewExt;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -30,13 +32,18 @@ fn build_ui(app: &Application) {
     let vbox = Box::new(Orientation::Vertical, 0);
 
     // === Editor ===
-    let text_view = TextView::new();
-    let buffer = text_view.buffer();
+    let buffer = Buffer::new(None);
+    let source_view = View::with_buffer(&buffer);
+    source_view.set_show_line_numbers(true);
+    source_view.set_highlight_current_line(true);
+    source_view.set_monospace(true);
+
+
     let file_state: Rc<RefCell<Option<PathBuf>>> =
         Rc::new(RefCell::new(None));
 
     let scrolled = ScrolledWindow::builder()
-        .child(&text_view)
+        .child(&source_view)
         .vexpand(true)
         .hexpand(true)
         .build();

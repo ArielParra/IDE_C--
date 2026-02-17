@@ -5,3 +5,4 @@ edition = "2024"
 
 [dependencies]
 gtk = { version = "0.7", package = "gtk4",features = ["v4_10"] }
+sourceview5 = "0.7"

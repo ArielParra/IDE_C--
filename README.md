@@ -13,24 +13,25 @@ winget install MSYS2.MSYS2
 ### Inside MSYS2 UCRT64
 ```sh
 pacman -Syuu
-pacman -S mingw-w64-ucrt-x86_64-rust \
-           mingw-w64-ucrt-x86_64-gtk4 \
-           mingw-w64-ucrt-x86_64-pkgconf \
-           mingw-w64-ucrt-x86_64-gcc
+pacman -S mingw-w64-ucrt-x86_64-rust mingw-w64-ucrt-x86_64-gtk4  mingw-w64-ucrt-x86_64-gtksourceview5 mingw-w64-ucrt-x86_64-pkgconf mingw-w64-ucrt-x86_64-gcc
 ```
 
+## MacOs (Diana)
 
-rustup default stable-x86_64-pc-windows-gnu
+```sh
+brew install rust gtk4 gtksourceview5 pkg-config
+```
+
 
 ## alpine linux (Ariel)
 
 ```sh
-doas apk add rust cargo build-base pkgconf gtk4.0 gtk4.0-dev build-base pkgconf glib-dev gobject-introspection-dev cairo-dev pango-dev gdk-pixbuf-dev
+doas apk add rust cargo build-base pkgconf gtk4-dev gtksourceview5-dev glib-dev gobject-introspection-dev cairo-dev pango-dev gdk-pixbuf-dev
 ```
 
 ## Arch (Miguel)
 ```sh
-sudo pacman -S rust cargo base-devel pkgconf gtk4
+sudo pacman -S rust cargo base-devel pkgconf gtk4 gtksourceview5
 ```
 
 # After Installation (Inside the project)
