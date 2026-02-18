@@ -45,11 +45,12 @@ fn build_ui(app: &Application) {
         .build();
    // let vbox = Box::new(Orientation::Vertical, 0);
 
-    // TEXT VIEWS
-
     // === Editor ===
-    let text_view = TextView::new();
-    let buffer = text_view.buffer();
+    let buffer = Buffer::new(None);
+    let source_view = View::with_buffer(&buffer);
+    source_view.set_show_line_numbers(true);
+    source_view.set_highlight_current_line(true);
+    source_view.set_monospace(true);
 
     // NOTEBOOKS
     let debugnotebook = Notebook::new();
@@ -58,8 +59,9 @@ fn build_ui(app: &Application) {
     
     // FOR DONDE CREAREMOS LABEL, SCROLLED Y SOURCEVIEW
     let labels_debug = ["Lexico","Sintactico","Semantico","Hash Table","Codigo Intermedio"];
-    for i in 0..4{  
+    for i in 0..5{  
         let textview = TextView::new();
+        textview.set_editable(false);
         let scrolled = ScrolledWindow::builder()
         .child(&textview)
         .vexpand(true)
@@ -67,10 +69,12 @@ fn build_ui(app: &Application) {
         .build();
         let label = Label::new(Some(&labels_debug[i]));
         debugnotebook.append_page(&scrolled, Some(&label));
+
     }
      let labels_errores = ["Errores Lexicos","Errores Sintacticos","Errores Semanticos","Resultados"];
     for i in 0..4{  
         let textview = TextView::new();
+        textview.set_editable(false);
         let scrolled = ScrolledWindow::builder()
         .child(&textview)
         .vexpand(true)
@@ -87,7 +91,7 @@ fn build_ui(app: &Application) {
 
     // INSTANCIAS DE LOS SCROLLED WINDOWS
     let codigo = ScrolledWindow::builder()
-        .child(&text_view)
+        .child(&source_view)
         .vexpand(true)
         .hexpand(true)
         .build();
