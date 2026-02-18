@@ -5,6 +5,8 @@ use gtk::{
     TextView, ScrolledWindow,Paned, gio, Notebook, Label
 };
 use gtk::gdk::Display;
+use sourceview5::{View, Buffer};
+use sourceview5::prelude::ViewExt;
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;

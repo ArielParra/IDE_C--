@@ -9,12 +9,14 @@ use crate::file_manager;
 pub fn build_menu(
     app: &Application,
     window: &ApplicationWindow,
-    buffer: &gtk::TextBuffer,
+    buffer: &impl IsA<gtk::TextBuffer>,
     file_state: Rc<RefCell<Option<PathBuf>>>,
 ) -> PopoverMenuBar {
 
     // === Menu Model ===
     let menu_model = gio::Menu::new();
+
+    let text_buffer: gtk::TextBuffer = buffer.as_ref().clone();
 
     let file_menu = gio::Menu::new();
     file_menu.append(Some("New"), Some("app.new"));
@@ -27,9 +29,8 @@ pub fn build_menu(
     menu_model.append_submenu(Some("File"), &file_menu);
 
     // === Actions ===
-
-    // NEW
-    let buffer_clone = buffer.clone();
+// NEW
+    let buffer_clone = text_buffer.clone();
     let file_state_clone = file_state.clone();
     let new_action = gio::SimpleAction::new("new", None);
     new_action.connect_activate(move |_, _| {
@@ -39,7 +40,7 @@ pub fn build_menu(
 
     // OPEN
     let window_clone = window.clone();
-    let buffer_clone = buffer.clone();
+    let buffer_clone = text_buffer.clone();
     let file_state_clone = file_state.clone();
     let open_action = gio::SimpleAction::new("open", None);
     open_action.connect_activate(move |_, _| {
@@ -61,7 +62,7 @@ pub fn build_menu(
 
     // SAVE
     let window_clone = window.clone();
-    let buffer_clone = buffer.clone();
+    let buffer_clone = text_buffer.clone();
     let file_state_clone = file_state.clone();
     let save_action = gio::SimpleAction::new("save", None);
     save_action.connect_activate(move |_, _| {
@@ -75,7 +76,7 @@ pub fn build_menu(
 
     // SAVE AS
     let window_clone = window.clone();
-    let buffer_clone = buffer.clone();
+    let buffer_clone = text_buffer.clone();
     let file_state_clone = file_state.clone();
     let save_as_action = gio::SimpleAction::new("save_as", None);
     save_as_action.connect_activate(move |_, _| {
