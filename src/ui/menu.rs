@@ -3,6 +3,7 @@ use gtk::{Application, ApplicationWindow, PopoverMenuBar, gio};
 use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
+use std::process::Command;
 //use gtk::{HeaderBar, Button, Picture, Box, Orientation};
 
 use crate::file_manager;
@@ -37,7 +38,7 @@ pub fn build_menu(
 
     //BUILD & DEBUG
     let build_debug_menu = gio::Menu::new();
-    build_debug_menu.append(Some("Compile"), Some("app.compile"));
+    build_debug_menu.append(Some("Compile1"), Some("app.compile1"));//probaremos en la seccion compilar esta funcion
     build_debug_menu.append(Some("Run"), Some("app.run"));
     build_debug_menu.append(Some("Debug"), Some("app.debug"));
 
@@ -167,6 +168,38 @@ pub fn build_menu(
         app_clone.quit();
     });
     app.add_action(&exit_action);
+    
+    // COMPILE
+    /*let window_clone = window.clone();
+    let buffer_clone = text_buffer.clone();
+    let file_state_clone = file_state.clone();*/
+
+    let file_state_clone = file_state.clone();
+    let compile_action = gio::SimpleAction::new("compile", None);
+    compile_action.connect_activate(move |_, _| {
+
+    if let Some(path) = &*file_state_clone.borrow() {
+
+        let output = Command::new("./compilador.exe") // Ruta de lo que se va a compilar
+            .arg(path)
+            .output()
+            .expect("No se pudo ejecutar el compilador");
+
+        println!("Salida:");
+        println!("{}", String::from_utf8_lossy(&output.stdout));
+
+        println!("Errores:");
+        println!("{}", String::from_utf8_lossy(&output.stderr));
+
+        } else {
+            println!("No hay archivo abierto.");
+        }
+    });
+
+    app.add_action(&compile_action);
+
+
+
 
     PopoverMenuBar::from_model(Some(&menu_model))
 }

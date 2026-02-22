@@ -1,4 +1,4 @@
-use gtk::glib::error;
+//use gtk::glib::error;
 use gtk::{CssProvider, prelude::*};
 use gtk::{
     Box, Orientation,
@@ -6,8 +6,8 @@ use gtk::{
 };
     use gtk::ApplicationWindow;
     use gtk::Application;
-    use gtk::Button;
-    use gtk::HeaderBar;
+    //use gtk::Button;
+    //use gtk::HeaderBar;
 
 use gtk::gdk::Display;
 use sourceview5::{View, Buffer};
@@ -51,9 +51,9 @@ fn build_ui(app: &Application) {
         .default_height(600)
         .build();
 
-    let header = gtk::HeaderBar::new();
-window.set_titlebar(Some(&header));
-   // let vbox = Box::new(Orientation::Vertical, 0);
+    /*let header = gtk::HeaderBar::new();
+    window.set_titlebar(Some(&header));*/
+    // let vbox = Box::new(Orientation::Vertical, 0);
 
     //ICONS
     // ===== HEADERBAR CON ICONOS =====
