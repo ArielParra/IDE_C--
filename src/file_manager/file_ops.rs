@@ -1,12 +1,11 @@
 use gtk::prelude::*;
-use gtk::{ApplicationWindow, FileDialog};
+use gtk::{ApplicationWindow, FileChooserNative, FileChooserAction, ResponseType};
 use std::cell::RefCell;
 use std::fs;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::rc::Rc;
 
-//Create a new file by clearing the buffer and resetting the current file path
 pub fn new_file(
     buffer: &gtk::TextBuffer,
     current_file: Rc<RefCell<Option<PathBuf>>>,
@@ -15,22 +14,22 @@ pub fn new_file(
     *current_file.borrow_mut() = None;
 }
 
-//Open a file dialog to select a file, read its contents, and display it in the text buffer
-pub fn open_file_dialog(
+pub fn open_file(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
     current_file: Rc<RefCell<Option<PathBuf>>>,
 ) {
-    let dialog = FileDialog::builder()
-        .title("Open File")
-        .modal(true)
-        .build();
-
-    dialog.open(
+    let dialog = FileChooserNative::new(
+        Some("Open File"),
         Some(window),
-        None::<&gtk::gio::Cancellable>,
-        move |result| {
-            if let Ok(file) = result {
+        FileChooserAction::Open,
+        Some("Open"),
+        Some("Cancel"),
+    );
+
+    dialog.connect_response(move |dialog, response| {
+        if response == ResponseType::Accept {
+            if let Some(file) = dialog.file() {
                 if let Some(path) = file.path() {
                     if let Ok(mut f) = fs::File::open(&path) {
                         let mut contents = String::new();
@@ -41,11 +40,13 @@ pub fn open_file_dialog(
                     }
                 }
             }
-        },
-    );
+        }
+        dialog.destroy();
+    });
+
+    dialog.show();
 }
 
-//Save the CURRENT file if it exists, otherwise open a save dialog to create a new file
 pub fn save_file(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
@@ -64,23 +65,22 @@ pub fn save_file(
     }
 }
 
-
-//Open a save dialog to select a location and filename, then save the contents of the text buffer to that file and update the current file path
 pub fn save_as_file_dialog(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
     current_file: Rc<RefCell<Option<PathBuf>>>,
 ) {
-    let dialog = FileDialog::builder()
-        .title("Save File")
-        .modal(true)
-        .build();
-
-    dialog.save(
+    let dialog = FileChooserNative::new(
+        Some("Save File"),
         Some(window),
-        None::<&gtk::gio::Cancellable>,
-        move |result| {
-            if let Ok(file) = result {
+        FileChooserAction::Save,
+        Some("Save"),
+        Some("Cancel"),
+    );
+
+    dialog.connect_response(move |dialog, response| {
+        if response == ResponseType::Accept {
+            if let Some(file) = dialog.file() {
                 if let Some(path) = file.path() {
                     let start = buffer.start_iter();
                     let end = buffer.end_iter();
@@ -92,6 +92,9 @@ pub fn save_as_file_dialog(
                     }
                 }
             }
-        },
-    );
+        }
+        dialog.destroy();
+    });
+
+    dialog.show();
 }
