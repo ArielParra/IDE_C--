@@ -188,7 +188,7 @@ fn build_ui(app: &Application) {
     panedprincipal.set_end_child(Some(&errorbox));
 
     // LA CAJA DE ERRORES DEBE VERSE MAS ABAJO 
-    panedprincipal.set_position(700);
+    panedprincipal.set_position(500);
 
         
     // === Menu ===
