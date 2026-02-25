@@ -176,6 +176,7 @@ fn build_ui(app: &Application) {
     errorbox.add_css_class("margin");
     errorbox.set_hexpand(true);
     errorbox.set_vexpand(true);
+    
     errorbox.append(&erroresnotebook);
 
 
@@ -187,9 +188,7 @@ fn build_ui(app: &Application) {
     panedprincipal.set_start_child(Some(&panedtop));
     panedprincipal.set_end_child(Some(&errorbox));
 
-    // LA CAJA DE ERRORES DEBE VERSE MAS ABAJO 
-    panedprincipal.set_position(500);
-
+  
         
     // === Menu ===
     let menubar =
