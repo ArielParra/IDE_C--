@@ -97,10 +97,10 @@ fn build_ui(app: &Application) {
     // NOTEBOOKS
     let debugnotebook = Notebook::new();
     debugnotebook.add_css_class("nopadding");
-    let erroresnotebook = Notebook::new();
+    let errorsnotebook = Notebook::new();
     
     // FOR DONDE CREAREMOS LABEL, SCROLLED Y SOURCEVIEW
-    let labels_debug = ["Lexico","Sintactico","Semantico","Hash Table","Codigo Intermedio"];
+    let labels_debug = ["Lexic","Syntax","Semantic","Hash Table","Intermediate Code"];
     for i in 0..5{  
         let textview = TextView::new();
         textview.set_editable(false);
@@ -113,7 +113,7 @@ fn build_ui(app: &Application) {
         debugnotebook.append_page(&scrolled, Some(&label));
 
     }
-     let labels_errores = ["Errores Lexicos","Errores Sintacticos","Errores Semanticos","Resultados"];
+     let labels_errors = ["Lexic Errors","Syntax Errors","Semantic Errors","Results"];
     for i in 0..4{  
         let textview = TextView::new();
         textview.set_editable(false);
@@ -122,8 +122,8 @@ fn build_ui(app: &Application) {
         .vexpand(true)
         .hexpand(true)
         .build();
-        let label = Label::new(Some(&labels_errores[i]));
-        erroresnotebook.append_page(&scrolled, Some(&label));
+        let label = Label::new(Some(&labels_errors[i]));
+        errorsnotebook.append_page(&scrolled, Some(&label));
     }
 
 
@@ -176,7 +176,7 @@ fn build_ui(app: &Application) {
     errorbox.add_css_class("margin");
     errorbox.set_hexpand(true);
     errorbox.set_vexpand(true);
-    errorbox.append(&erroresnotebook);
+    errorbox.append(&errorsnotebook);
 
 
     // AGREGAMOS CAJA DEL CODIGO Y CAJA DEL DEBUG AL PANEL SUPERIOR

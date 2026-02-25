@@ -1,9 +1,11 @@
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, PopoverMenuBar, gio};
 use std::cell::RefCell;
+use std::process::{Command, Stdio};
+use std::io::{BufRead, BufReader};
+use std::thread;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::process::Command;
 //use gtk::{HeaderBar, Button, Picture, Box, Orientation};
 
 use crate::file_manager;
@@ -80,12 +82,12 @@ pub fn build_menu(
 
     //COMPILAR
     let compilar_menu = gio::Menu::new();
-    compilar_menu.append(Some("Compile"), Some("app.compile"));
-    compilar_menu.append(Some("Análisis Léxico"), Some("app.lexico"));
-    compilar_menu.append(Some("Análisis Sintáctico"), Some("app.sintactico"));
-    compilar_menu.append(Some("Análisis Semántico"), Some("app.semantico"));
-    compilar_menu.append(Some("Código Intermedio"), Some("app.intermedio"));
-    compilar_menu.append(Some("Ejecución"), Some("app.ejecutar"));
+    compilar_menu.append(Some("Compile"), Some("app.c--compiler"));
+    compilar_menu.append(Some("Lexical Analysis"), Some("app.lexico"));
+    compilar_menu.append(Some("Syntax Analysis"), Some("app.sintactico"));
+    compilar_menu.append(Some("Semantic Analysis"), Some("app.semantico"));
+    compilar_menu.append(Some("Intermediate Code"), Some("app.intermedio"));
+    compilar_menu.append(Some("Execute"), Some("app.ejecutar"));
 
     //Ramas del menu
     //FILE, EDIT, BUILD & DEBUG, ICONO1, ICONO2, ICONO3, CLOSE, LEXICO, SINTACTICO, SEMANTICO, COMPILAR  ETC.
@@ -173,27 +175,64 @@ pub fn build_menu(
     /*let window_clone = window.clone();
     let buffer_clone = text_buffer.clone();
     let file_state_clone = file_state.clone();*/
-
     let file_state_clone = file_state.clone();
-    let compile_action = gio::SimpleAction::new("compile", None);
+
+    let compile_action = gio::SimpleAction::new("c--compiler", None);
+
     compile_action.connect_activate(move |_, _| {
 
-    if let Some(path) = &*file_state_clone.borrow() {
-
-        let output = Command::new("./compilador.exe") // Ruta de lo que se va a compilar
-            .arg(path)
-            .output()
-            .expect("No se pudo ejecutar el compilador");
-
-        println!("Salida:");
-        println!("{}", String::from_utf8_lossy(&output.stdout));
-
-        println!("Errores:");
-        println!("{}", String::from_utf8_lossy(&output.stderr));
-
-        } else {
-            println!("No hay archivo abierto.");
+    let path = match &*file_state_clone.borrow() {
+        Some(p) => p.clone(),
+        None => {
+            eprintln!("No file selected to compile.");
+            return;
         }
+    };
+
+    let compiler_path = if cfg!(target_os = "windows") {
+        "bin/windows/c--compiler.exe"
+    } else if cfg!(target_os = "macos") {
+        "bin/macos/c--compiler"
+    } else {
+        "bin/linux/c--compiler"
+    };
+
+    let mut child = match Command::new(compiler_path)
+        .arg(&path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Failed to start compiler: {}", e);
+            return;
+        }
+    };
+
+    // === STDOUT THREAD ===
+    if let Some(stdout) = child.stdout.take() {
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines() {
+                if let Ok(l) = line {
+                    println!("OUT: {}", l);
+                }
+            }
+        });
+    }
+
+    // === STDERR THREAD ===
+    if let Some(stderr) = child.stderr.take() {
+        thread::spawn(move || {
+            let reader = BufReader::new(stderr);
+            for line in reader.lines() {
+                if let Ok(l) = line {
+                    eprintln!("ERR: {}", l);
+                }
+            }
+        });
+    }
     });
 
     app.add_action(&compile_action);
