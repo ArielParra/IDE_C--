@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use gtk::{ApplicationWindow, FileChooserNative, FileChooserAction, ResponseType};
+use gtk::{ApplicationWindow, FileDialog};
 use std::cell::RefCell;
 use std::fs;
 use std::io::{Read, Write};
@@ -14,22 +14,21 @@ pub fn new_file(
     *current_file.borrow_mut() = None;
 }
 
-pub fn open_file(
+pub fn open_file_dialog(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
     current_file: Rc<RefCell<Option<PathBuf>>>,
 ) {
-    let dialog = FileChooserNative::new(
-        Some("Open File"),
-        Some(window),
-        FileChooserAction::Open,
-        Some("Open"),
-        Some("Cancel"),
-    );
+    let dialog = FileDialog::builder()
+        .title("Open File")
+        .modal(true)
+        .build();
 
-    dialog.connect_response(move |dialog, response| {
-        if response == ResponseType::Accept {
-            if let Some(file) = dialog.file() {
+    dialog.open(
+        Some(window),
+        None::<&gtk::gio::Cancellable>,
+        move |result| {
+            if let Ok(file) = result {
                 if let Some(path) = file.path() {
                     if let Ok(mut f) = fs::File::open(&path) {
                         let mut contents = String::new();
@@ -40,11 +39,8 @@ pub fn open_file(
                     }
                 }
             }
-        }
-        dialog.destroy();
-    });
-
-    dialog.show();
+        },
+    );
 }
 
 pub fn save_file(
@@ -70,17 +66,16 @@ pub fn save_as_file_dialog(
     buffer: gtk::TextBuffer,
     current_file: Rc<RefCell<Option<PathBuf>>>,
 ) {
-    let dialog = FileChooserNative::new(
-        Some("Save File"),
-        Some(window),
-        FileChooserAction::Save,
-        Some("Save"),
-        Some("Cancel"),
-    );
+    let dialog = FileDialog::builder()
+        .title("Save File")
+        .modal(true)
+        .build();
 
-    dialog.connect_response(move |dialog, response| {
-        if response == ResponseType::Accept {
-            if let Some(file) = dialog.file() {
+    dialog.save(
+        Some(window),
+        None::<&gtk::gio::Cancellable>,
+        move |result| {
+            if let Ok(file) = result {
                 if let Some(path) = file.path() {
                     let start = buffer.start_iter();
                     let end = buffer.end_iter();
@@ -92,9 +87,6 @@ pub fn save_as_file_dialog(
                     }
                 }
             }
-        }
-        dialog.destroy();
-    });
-
-    dialog.show();
+        },
+    );
 }
