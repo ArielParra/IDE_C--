@@ -204,5 +204,43 @@ pub fn build_menu(
 
     app.add_action(&compile_action);
 
+    //============ACTION OF BUTTONS IN HEADERBAR===========
+    // -------- OPEN FILE ICON ------  
+    let window_clone = window.clone();
+    let buffer_clone = text_buffer.clone();
+    let file_state_clone = file_state.clone();
+    let open_btn = gio::SimpleAction::new("open", None);
+    open_btn.connect_activate(move |_, _| {
+        file_manager::file_ops::open_file_dialog(
+            &window_clone,
+            buffer_clone.clone(),
+            file_state_clone.clone(),
+        );
+    });
+    app.add_action(&open_btn);
+    
+    // -------- NEW FILE ICON -------
+    let buffer_clone = text_buffer.clone();
+    let file_state_clone = file_state.clone();
+    let new_btn = gio::SimpleAction::new("new", None);
+    new_btn.connect_activate(move |_, _| {
+        file_manager::file_ops::new_file(&buffer_clone, file_state_clone.clone());
+    });
+    app.add_action(&new_btn);
+
+    // -------- SAVE FILE ICON ------
+    let window_clone = window.clone();
+    let buffer_clone = text_buffer.clone();
+    let file_state_clone = file_state.clone();
+    let save_btn = gio::SimpleAction::new("save", None);
+    save_btn.connect_activate(move |_, _| {
+        file_manager::file_ops::save_file(
+            &window_clone,
+            buffer_clone.clone(),
+            file_state_clone.clone(),
+        );
+    });
+    app.add_action(&save_btn);
+
     PopoverMenuBar::from_model(Some(&menu_model))
 }

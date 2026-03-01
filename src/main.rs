@@ -14,6 +14,8 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
+use gtk::{HeaderBar, Button};
+
 mod file_manager;
 mod ui;
 
@@ -155,11 +157,73 @@ fn build_ui(app: &Application) {
     let menubar =
     ui::menu::build_menu(app, &window, &buffer, file_state.clone());
 
+
+
+    // ===== HEADERBAR =====
+    let header = HeaderBar::new();
+
+    // ------ NEW FILE ICON ------
+    let new_btn = Button::builder()
+        .icon_name("document-new-symbolic")
+        .tooltip_text("New File")
+        .build();
+
+    let app_clone = app.clone();
+    new_btn.connect_clicked(move |_| {
+        app_clone.activate_action("new", None);
+    });
+
+    // ------ OPEN FILE ICON ------
+    let open_btn = Button::builder()
+        .icon_name("document-open-symbolic")
+        .tooltip_text("Open File")
+        .build();
+
+    let app_clone = app.clone();
+    open_btn.connect_clicked(move |_| {
+        app_clone.activate_action("open", None);
+    });
+
+
+    // ------ SAVE FILE ICON ------ 
+    let save_btn = Button::builder()
+        .icon_name("document-save-symbolic")
+        .tooltip_text("Save File")
+        .build();
+
+    let app_clone = app.clone();
+    save_btn.connect_clicked(move |_| {
+        app_clone.activate_action("save", None);
+    });
+
+    // Opcional: estilo plano moderno
+    open_btn.add_css_class("flat");
+    new_btn.add_css_class("flat");
+    save_btn.add_css_class("flat");
+
+
+    // Add to header
+     header.pack_start(&open_btn);
+     header.pack_start(&new_btn);
+     header.pack_start(&save_btn);
+
+    // Asignamos header a la ventana
+    window.set_titlebar(Some(&header));
+
+    // Agregamos botones al header
+    header.pack_start(&new_btn);
+
     // AGREGAMOS MENUBAR Y PANEL PRINCIPAL A LA CAJA DE LA VENTANA PRINCIPAL
     windowbox.append(&menubar);
     windowbox.append(&panedprincipal);
     // AGREGAMOS LA CAJA PRINCIPAL A LA VENTANA 
     window.set_child(Some(&windowbox));
     window.present();
+
+    //ICONOS
+    window.set_child(Some(&windowbox));
+    window.present();
+
     
 }
+
