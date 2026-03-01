@@ -1,4 +1,4 @@
-//use gtk::glib::error;
+use gtk::glib::error;
 use gtk::{CssProvider, prelude::*};
 use gtk::{
     Box, Orientation,
@@ -6,8 +6,6 @@ use gtk::{
 };
     use gtk::ApplicationWindow;
     use gtk::Application;
-    //use gtk::Button;
-    //use gtk::HeaderBar;
 
 use gtk::gdk::Display;
 use sourceview5::{View, Buffer};
@@ -50,42 +48,6 @@ fn build_ui(app: &Application) {
         .default_width(900)
         .default_height(600)
         .build();
-
-    /*let header = gtk::HeaderBar::new();
-    window.set_titlebar(Some(&header));*/
-    // let vbox = Box::new(Orientation::Vertical, 0);
-
-    //ICONS
-    // ===== HEADERBAR CON ICONOS =====
-    /*let header = HeaderBar::new();
-
-    // Nuevo
-    let new_btn = Button::from_icon_name("document-new-symbolic");
-    let app_clone = app.clone();
-    new_btn.connect_clicked(move |_| {
-        app_clone.activate_action("new", None);
-    });
-
-    // Guardar
-    let save_btn = Button::from_icon_name("document-save-symbolic");
-    let app_clone = app.clone();
-    save_btn.connect_clicked(move |_| {
-    app_clone.activate_action("save", None);
-    });
-
-    // Ejecutar
-    let run_btn = Button::from_icon_name("media-playback-start-symbolic");
-    let app_clone = app.clone();
-    run_btn.connect_clicked(move |_| {
-        app_clone.activate_action("run", None);
-    });
-
-    header.pack_start(&new_btn);
-    header.pack_start(&save_btn);
-    header.pack_end(&run_btn);
-
-    window.set_titlebar(Some(&header));*/
-
 
     // === Editor ===
     let buffer = Buffer::new(None);

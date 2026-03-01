@@ -65,7 +65,6 @@ pub fn build_menu(
     menu_model.append_submenu(Some("File"), &file_menu);
     menu_model.append_submenu(Some("Edit"), &edit_menu);
     menu_model.append_submenu(Some("Build & Debug"), &build_debug_menu);
-
     menu_model.append_submenu(Some("Lexical Analysis"), &lexico_menu);
     menu_model.append_submenu(Some("Syntax Analysis"), &sintactico_menu);
     menu_model.append_submenu(Some("Semantic Analysis"), &semantico_menu);
@@ -138,7 +137,8 @@ pub fn build_menu(
         app_clone.quit();
     });
     app.add_action(&exit_action);
-// COMPILE
+
+    // COMPILE
     /*let window_clone = window.clone();
     let buffer_clone = text_buffer.clone();
     let file_state_clone = file_state.clone();*/
