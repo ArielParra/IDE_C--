@@ -214,7 +214,7 @@ fn build_ui(app: &Application) {
 
     let app_clone = app.clone();
     save_as_btn.connect_clicked(move |_| {
-        app_clone.activate_action("save-as", None);
+        app_clone.activate_action("save_as", None);
     });
 
     // ------ EXIT ICON ------
