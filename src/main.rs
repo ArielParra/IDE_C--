@@ -1,4 +1,4 @@
-use gtk::glib::error;
+use gtk::glib::{PropertyGet, error};
 use gtk::{CssProvider, prelude::*};
 use gtk::{
     Box, Orientation,
@@ -42,6 +42,11 @@ fn load_css(){
     );
  
 }
+
+fn printlinescol(col: i32,line: i32){
+    println!("Ln {}, Col {}",line,col);
+}
+
 fn build_ui(app: &Application) {
   
    let window = ApplicationWindow::builder()
@@ -267,12 +272,38 @@ fn build_ui(app: &Application) {
     windowbox.append(&menubar);
     windowbox.append(&panedprincipal);
 
+    
+    // BOX DE LINEAS Y COLUMNAS
+    let bottomline  = Box::new(Orientation::Vertical, 0);
+    bottomline.set_size_request(0, 20);
+    let textocollines = Rc::new(TextView::new());
+    let textocollines_clone = Rc::clone(&textocollines);
+
+    let bufferlinescoles = textocollines_clone.buffer();
+    let text = format!("Lin {}, Col {}", 1, 1);
+    bufferlinescoles.set_text(&text);
+
+
+    buffer.connect_cursor_position_notify(move |buffer| {
+        let cursor_position = buffer.cursor_position();
+        let mut iter = buffer.iter_at_offset(cursor_position);
+        let line = iter.line();
+        let col = iter.line_offset();
+        let text = format!("Lin {}, Col {}", line + 1, col + 1);
+
+        let bufferlinescoles = textocollines_clone.buffer();
+        bufferlinescoles.set_text(&text);
+    });
+
+    bottomline.append(&*textocollines);
+    bottomline.set_margin_start(10);
+
+
+    windowbox.append(&bottomline);
+
     // AGREGAMOS LA CAJA PRINCIPAL A LA VENTANA 
     window.set_child(Some(&windowbox));
-    window.present();
 
-    //ICONOS
-    window.set_child(Some(&windowbox));
     window.present();
     
 }
