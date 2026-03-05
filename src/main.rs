@@ -184,6 +184,16 @@ fn build_ui(app: &Application) {
         app_clone.activate_action("open", None);
     });
 
+    // ------ CLOSE FILE ICON ------
+     let close_btn = Button::builder()
+        .icon_name("document-close-symbolic")
+        .tooltip_text("Close File")
+        .build();  
+
+    let app_clone = app.clone();
+    close_btn.connect_clicked(move |_| {
+        app_clone.activate_action("close", None);
+    });
 
     // ------ SAVE FILE ICON ------ 
     let save_btn = Button::builder()
@@ -196,16 +206,56 @@ fn build_ui(app: &Application) {
         app_clone.activate_action("save", None);
     });
 
+    // ------ SAVE AS FILE ICON ------
+    let save_as_btn = Button::builder()
+        .icon_name("document-save-as-symbolic")
+        .tooltip_text("Save As File")
+        .build();
+
+    let app_clone = app.clone();
+    save_as_btn.connect_clicked(move |_| {
+        app_clone.activate_action("save-as", None);
+    });
+
+    // ------ EXIT ICON ------
+    let exit_btn = Button::builder()
+        .icon_name("application-exit-symbolic")
+        .tooltip_text("Exit")
+        .build();
+
+    let app_clone = app.clone();
+    exit_btn.connect_clicked(move |_| {
+        app_clone.activate_action("exit", None);
+    });
+
+    // ------ EXECUTE ICON ------
+    let execute_btn = Button::builder()
+        .icon_name("system-run-symbolic")
+        .tooltip_text("Execute")
+        .build();
+
+    let app_clone = app.clone();
+    execute_btn.connect_clicked(move |_| {
+        app_clone.activate_action("execute", None);
+    });
+
     // Opcional: estilo plano moderno
     open_btn.add_css_class("flat");
     new_btn.add_css_class("flat");
+    close_btn.add_css_class("flat");
     save_btn.add_css_class("flat");
-
+    save_as_btn.add_css_class("flat");
+    exit_btn.add_css_class("flat");
+    execute_btn.add_css_class("flat");
 
     // Add to header
      header.pack_start(&open_btn);
      header.pack_start(&new_btn);
+     header.pack_start(&close_btn);
      header.pack_start(&save_btn);
+     header.pack_start(&save_as_btn);
+     header.pack_start(&exit_btn);
+     header.pack_start(&execute_btn);
 
     // Asignamos header a la ventana
     window.set_titlebar(Some(&header));
@@ -216,6 +266,7 @@ fn build_ui(app: &Application) {
     // AGREGAMOS MENUBAR Y PANEL PRINCIPAL A LA CAJA DE LA VENTANA PRINCIPAL
     windowbox.append(&menubar);
     windowbox.append(&panedprincipal);
+
     // AGREGAMOS LA CAJA PRINCIPAL A LA VENTANA 
     window.set_child(Some(&windowbox));
     window.present();
@@ -223,7 +274,6 @@ fn build_ui(app: &Application) {
     //ICONOS
     window.set_child(Some(&windowbox));
     window.present();
-
     
 }
 

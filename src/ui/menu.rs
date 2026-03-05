@@ -205,6 +205,15 @@ pub fn build_menu(
     app.add_action(&compile_action);
 
     //============ACTION OF BUTTONS IN HEADERBAR===========
+    // -------- NEW FILE ICON -------
+    let buffer_clone = text_buffer.clone();
+    let file_state_clone = file_state.clone();
+    let new_btn = gio::SimpleAction::new("new", None);
+    new_btn.connect_activate(move |_, _| {
+        file_manager::file_ops::new_file(&buffer_clone, file_state_clone.clone());
+    });
+    app.add_action(&new_btn);
+
     // -------- OPEN FILE ICON ------  
     let window_clone = window.clone();
     let buffer_clone = text_buffer.clone();
@@ -219,14 +228,13 @@ pub fn build_menu(
     });
     app.add_action(&open_btn);
     
-    // -------- NEW FILE ICON -------
-    let buffer_clone = text_buffer.clone();
-    let file_state_clone = file_state.clone();
-    let new_btn = gio::SimpleAction::new("new", None);
-    new_btn.connect_activate(move |_, _| {
-        file_manager::file_ops::new_file(&buffer_clone, file_state_clone.clone());
+    //-------- CLOSE FILE ICON ------
+    let app_clone = app.clone();
+    let close_action = gio::SimpleAction::new("close", None);
+    close_action.connect_activate(move |_, _| {
+        app_clone.activate_action("new", None);
     });
-    app.add_action(&new_btn);
+    app.add_action(&close_action);
 
     // -------- SAVE FILE ICON ------
     let window_clone = window.clone();
@@ -241,6 +249,29 @@ pub fn build_menu(
         );
     });
     app.add_action(&save_btn);
+
+    // -------- SAVE AS FILE ICON ------
+    let window_clone = window.clone();
+    let buffer_clone = text_buffer.clone();
+    let file_state_clone = file_state.clone();
+    let save_as_action = gio::SimpleAction::new("save_as", None);
+    save_as_action.connect_activate(move |_, _| {
+        file_manager::file_ops::save_as_file_dialog(
+            &window_clone,
+            buffer_clone.clone(),
+            file_state_clone.clone(),
+        );
+    });
+    app.add_action(&save_as_action);
+
+    //-------- EXIT ICON --------
+    let app_clone = app.clone();
+    let exit_action = gio::SimpleAction::new("exit", None);
+    exit_action.connect_activate(move |_, _| {
+        app_clone.quit();
+    });
+    app.add_action(&exit_action);
+
 
     PopoverMenuBar::from_model(Some(&menu_model))
 }
