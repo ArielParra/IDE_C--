@@ -1,4 +1,3 @@
-use gtk::glib::error;
 use gtk::{CssProvider, prelude::*};
 use gtk::{
     Box, Orientation,
@@ -259,9 +258,6 @@ fn build_ui(app: &Application) {
 
     // Asignamos header a la ventana
     window.set_titlebar(Some(&header));
-
-    // Agregamos botones al header
-    header.pack_start(&new_btn);
 
     // AGREGAMOS MENUBAR Y PANEL PRINCIPAL A LA CAJA DE LA VENTANA PRINCIPAL
     windowbox.append(&menubar);
