@@ -219,7 +219,7 @@ fn build_ui(app: &Application) {
 
     let app_clone = app.clone();
     save_as_btn.connect_clicked(move |_| {
-        app_clone.activate_action("save-as", None);
+        app_clone.activate_action("save_as", None);
     });
 
     // ------ EXIT ICON ------
@@ -264,9 +264,6 @@ fn build_ui(app: &Application) {
 
     // Asignamos header a la ventana
     window.set_titlebar(Some(&header));
-
-    // Agregamos botones al header
-    header.pack_start(&new_btn);
 
     // AGREGAMOS MENUBAR Y PANEL PRINCIPAL A LA CAJA DE LA VENTANA PRINCIPAL
     windowbox.append(&menubar);

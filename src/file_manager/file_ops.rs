@@ -2,7 +2,7 @@ use gtk::prelude::*;
 use gtk::{ApplicationWindow, FileDialog};
 use std::cell::RefCell;
 use std::fs;
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::PathBuf;
 use std::rc::Rc;
 
@@ -28,21 +28,22 @@ pub fn open_file_dialog(
         Some(window),
         None::<&gtk::gio::Cancellable>,
         move |result| {
-            if let Ok(file) = result {
-                if let Some(path) = file.path() {
-                    if let Ok(mut f) = fs::File::open(&path) {
-                        let mut contents = String::new();
-                        if f.read_to_string(&mut contents).is_ok() {
-                            buffer.set_text(&contents);
-                            *current_file.borrow_mut() = Some(path);
-                        }
-                    }
-                }
+            let res: Result<(), Box<dyn std::error::Error>> = (|| {
+                let file = result?;
+                let path = file.path().ok_or("Invalid path")?;
+                let bytes = fs::read(&path)?;
+                let contents = String::from_utf8_lossy(&bytes);
+                buffer.set_text(&contents);
+                *current_file.borrow_mut() = Some(path);
+
+                Ok(())
+            })();
+            if let Err(e) = res {
+                eprintln!("Open file error: {}", e);
             }
         },
     );
 }
-
 pub fn save_file(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
