@@ -1,4 +1,3 @@
-use gtk::glib::{PropertyGet, error};
 use gtk::{CssProvider, prelude::*};
 use gtk::{
     Box, Orientation,
@@ -41,10 +40,6 @@ fn load_css(){
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
  
-}
-
-fn printlinescol(col: i32,line: i32){
-    println!("Ln {}, Col {}",line,col);
 }
 
 fn build_ui(app: &Application) {
@@ -271,25 +266,25 @@ fn build_ui(app: &Application) {
 
     
     // BOX DE LINEAS Y COLUMNAS
-    let bottomline  = Box::new(Orientation::Vertical, 0);
+    let bottomline = Box::new(Orientation::Vertical, 0);
     bottomline.set_size_request(0, 20);
-    let textocollines = Rc::new(TextView::new());
+
+    let textocollines = Rc::new(Label::new(None));
     let textocollines_clone = Rc::clone(&textocollines);
 
-    let bufferlinescoles = textocollines_clone.buffer();
-    let text = format!("Lin {}, Col {}", 1, 1);
-    bufferlinescoles.set_text(&text);
+    textocollines.set_text("Lin 1, Col 1");
+    textocollines.set_xalign(0.0);
 
 
     buffer.connect_cursor_position_notify(move |buffer| {
         let cursor_position = buffer.cursor_position();
-        let mut iter = buffer.iter_at_offset(cursor_position);
+        let iter = buffer.iter_at_offset(cursor_position);
+
         let line = iter.line();
         let col = iter.line_offset();
-        let text = format!("Lin {}, Col {}", line + 1, col + 1);
 
-        let bufferlinescoles = textocollines_clone.buffer();
-        bufferlinescoles.set_text(&text);
+        let text = format!("Lin {}, Col {}", line + 1, col + 1);
+        textocollines_clone.set_text(&text);
     });
 
     bottomline.append(&*textocollines);

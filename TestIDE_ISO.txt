@@ -1,0 +1,330 @@
+   Esta estructura es especialmente importante para Ia portabilidad del compilador, en Ia cual el compilador esta diseftado con un enfoql!e hacia Ia modificaci6n, ya sea del c6digo fuente (lo que involucra volver a escribir Ia etapa inicial) o del c6digo objetivo (lo que implica reescribir Ia etapa final). En Ia practica esto ha probado ser diffcil de conseguir, y los denominados compiladores  portatiles todavfa tienden a poseer caracteð rfsticas que dependen tanto dellengnaje fuente como dellenguaje objetivo. Esto puede, en parte, ser culpa de los cambios rapidos y fundamentales tanto en los lenguajes de pro-? gramaci6n como en las arquitecturas de las maquinas, pero tambien es diffcil retener de rnanera eficaz a toda Ia informaci6n que uno pudiera necesitar a!cambiar  a un nuevo lenguaje  objetivo  o al crear  las estructuras de datos  adecuadamente generales  para permitir un cambio a un nuevo lenguaje fuente. No obstante,  una tcntativa consistente para separar las etapas inicial y final redundar:l en bcneficios para una portabilidad 1mis f<\cil.
+
+PASADAS
+Un compilador a menudo encuentra  conveniente procesar  todo el  programa  fucntc varias vcces antes de gcncrar cl c6digo. Estas rcpcticiones son conocidas como pasadas. Dcspucs del paso inicial, donde sc construye un arbol sintactico o Llll c6digo intermedin a partir de Ia fucnte,  una pasada consistc  tn proccsar  Ia rcprcscntaci6n   intermcdia,
+
+16	CAP.   I       I  INTROOUCCU)N
+
+
+agregando informacion a ella, alterando su estructura o produciendo una representacion diferente. Las pasadas pueden corresponder o no a las fases, a menudo una pasada conð sistini de varias etapas. En realidad, dependiendo dellenguaje,  un compilador puede ser de una pasada, en el que todas las fases se presentan durante un paso unico. Esto resulð ta en una compilacion eficaz pero tambien en (por lo regular) un codigo objetivo menos eficiente. Tanto Pascal como C son lenguajes que permiten la compilacion de una pasað da. (Modula-2 es un lenguaje cuya estructura requiere que un compilador tenga por lo menos dos pasadas.) La mayorfa de los compiladores con optimizaciones utilizan mas de una pasada; por lo regular se emplea una pasada para anal isis texico y sintactico, otra pasada para amilisis semantico y optimizacion a nivel del fuente, y una tercera pasada para generacion de codigo y optimizacion a nivel del objetivo. Los compiladores fuerð temente optimizadores pueden emplear incluso mas pasadas: cinco, seis o incluso ocho no son algo fuera de lo comun.
+
+DEFINICI6N   DE  LENGUAJE Y COMPILADORES
+Advertimos en Ia seccion 1.1 que las estructuras lexicas y sintacticas de un lenguaje de programacion por lo regular son especificadas en terminos formales y utili zan expresiones regulares y gramaticas libres de contexto. Sin embargo, Ia semantica de un lenguaje de programacion todavia es comunmente especificada utilizando descripciones en ingles (u otro lenguaje natural). Estas descripciones (junto con Ia estructura sintactica y lexica formales) generalmente son recopiladas en un manual de referenda del Ienguaje, o definicion de lenguaje. Con un nuevo lenguaje, una definicion de lenguaje y un comð pilador con frecuencia son desarrollados de manera simult:inea, puesto que las tecnicas disponibles para el escritor de compiladores pueden tener un impacto fundamental soð bre Ia definicion dellenguaje.  Similarmente, Ia manera en Ia que se define un lenguaje tendra un impacto fundamental sobre las tecnicas que son necesarias para construir el compilador.
+   Una situacion mas comun para el escritor de compiladores es que ellenguaje que se esta implementando es bien conocido y tiene una definicion de lenguaje existente. En ocasiones esta definicion de lenguaje ha alcanzado el nivel de un Ienguaje eshindar que ha sido aprobado por alguna de las organizaciones de estandarizacion oficiales, tal como Ia ANSI (American National Standards Institute) o ISO (International Orgað nization for Standardization). Por ejemplo, FORTRAN, Pascal y C tienen estandares ANSI. Ada tiene un estandar aprobado por el gobierno de Estados Unidos. En este caso, el escritor de compiladores debe interpretar Ia definicion de lenguaje e impleð mentar un compilador acorde con Ia definicion de lenguaje. Esto a menudo no es una tarea facil, pero en ocasiones se hace mas facil por Ia existencia de un conjunto de programas de prueba estandar (una suite o serie de pruebas) contra el cual un comð pilador puede ser contrastado (una serie de pruebas asf existe para Ada). Ellenguaje de ejemplo TINY empleado en el texto tiene su estructura lexica, sintactica y semanð tica especificadas en las secciones 2.5, 3.7 y 6.5, respectivamente. El apendice A contiene un manual de referenda del lenguaje mfnimo para el lenguaje de proyecto de compilador C-Minus.
+   Ocasionalmente,  un lenguaje tendni su semantica oada mediante una definicion formal en terminos matematicos. Varios metodos actualmente en uso son empleados para esto, y ningun metodo ha conseguido el nivel de un estandar, aunque Ia denominað da semantica denotacional se ha convcrtido en uno de los metodos mas comunes, csð pecialmente en Ia comunidad de programacion funcional. Cuando existe una definicion formal para un lenguaje, entonces (en teorfa) cs posible dar una prueba matemtitica de que un compilador se aviene a Ia definicion.  Sin embargo, hacer esto es tan diffcil que casi nunca se hace. En cualquier caso, las tecnicas para hacerlo asf rehasan el alcance de este texto, y las tecnicas de semantica formal no se estudiaran aquf.
+
+Otras  cuestiones   referentes  a  Ia  estructura   del  compilador 	17
+
+
+   Un aspecto de Ia construccion de compiladores que es particularmente afectado por Ia definicion de lenguaje es Ia estructura y comportamiento  del ambiente de ejecucion. Los ambientes de ejecucion se estudian con detalle en el capitulo 7. Sin embargo,  vale Ia pena notar aquf que Ia estructura de datos pennitida en un lenguaje de programacion, y  particularmente  las clases de llamadas de funciones y valores devueltos  permitidos, tienen un efecto decisivo sobre Ia complejidad del sistema de cjecucion.  En particular, los tres tipo.s basico.s de ambientes de ejecucion, en o.rden creciente de cmnplejidad,  Mm
+como se describe a continuaci6n:
+   En primer  Iugar, FORTRAN77,  sin apuntadores o asignaci6n  dimimica y sin llað madas a funciones  recursivas,  permite  un ambiente  de ejecuci6n  completamente esð tatico, donde toda Ia asignacion de memoria se hace antes de Ia ejecuci6n. Esto hace Ia labor de asignacion  particularmente facil para Ia persona que escribe  el compilador, en Ia medida que no necesita generarse codigo para mantener el ambiente. En segundo Iugar, Pascal, C y otros lenguajes provenientes del lenguaje Algol permiten una forma Jimitada de asignaci6n dinamica y llamadas de funciones recursivas y requieren un amð biente de ejecuci6n "semidinamico" o basado en pi las con una estructura dinamica adið cional conocida como heap, desde el cual el programador puede organizar Ia asignaci6n dimimica. Finalmente, los lenguajes  funcionales  y Ia mayoria de los lenguajes  orienð tados a objetos,  tales como LISP y Smalltalk,  requieren un ambiente "completamente dimimico" en el que toda asignacion se realiza de manera automatica  mediante c6digo generado  por el compilador. Esto es complicado,  porque se requiere que Ia memoria tambien sea liberada autom:lticatnente, y esto a su vez requiere complejos algoritmos de "recoleccion  de basura". Examinaremos esos metodos junto con nuestro estudio de los ambientes de ejecucion, aunque una completa relacion de esta area rebasa el alcance de este libro.
+
+OPCIONES DE COMPILADOR  E INTERFACES
+Un aspecto importante de Ia construcci6n de compiladores  es Ia inclusion de mecanisð mos para hacer interfaces con el sistema operativo y para proporcionar opciones al usuað rio para diversos propositos. Ejemplos de mecanismos de interfaces son el suministr.o de Ia entrada y facilidades de salida, ademas del acceso al sistema de archivos de la maquið na objetivo. Ejemplos de opciones de usuario incluyen Ia especificacion de listar caracð teristicas (longitud,  mensajes de error, tablas de referencia cruzada) asi como opciones de optimizacion de c6digo (rendimiento de ciertas optimizaciones  pero no otras). Tanto Ia interface como las opciones son calificadas colectivamente como las pragmaticas del compilador.  En ocasiones  una definici6n de lenguaje especificani  que se debe proporð cionar cierta pragm:ltica. Por ejemplo, Pascal y C especifican ciertos procedimientos de entrada/salida (en Pascal, son parte del propio lenguaje,  mientras que en C son parte de Ia especificacion de una librerfa estandar).  En Ada, varias directivas de compilað dor, denominadas pragmas,  son parte de Ia definicion dellenguaje. Por ejemplo,  las sentencias de Ada
+
+
+pragma   LIST(ON);
+
+
+pragma   LIST(OFF);
+
+generan  un listado de compilador  para Ia parte del programa contenida  dentro de los pragmas. En este texto veremos directivas de compilador solamente en el contexto de Ia generacion de un listado con infonnacion para propositos  de Ia depuraci6n  del comð pilador. Tambien,  no trataremos cuestiones sobre interfaces de entrada/salida  y sistema operativo,  pucsto que involucran considerables detallcs que varian demasiado de un sisð tema operativo a otro.
+
+18	CAP.    I    I  INTROOUCCU)N
+
+
+MANEJO DE ERRORE$
+Una de las funciones mas importantes de un compilador es su respuesta a los errores en un programa fuente. Los errores pueden ser detectados durante casi cualquier fase de Ia compilacion. Estos errores eshiticos  (o de tiempo  de compilaCion) deben ser notit1cados por un compilador, y es importante que el compilador sea capaz de generar mensajes de error significativos y reanudar Ia compilacion despues de cada error. Cada fase de un compilador necesitan\ una clase ligeramente diferente de manejo de erroð res, y, por lo tanto, un manejador  de errores  debe contener operaciones diferentes. cada una apropiada para una fase y situacion especffica. Por consiguiente, las tecnicas de manejo de errores para cada fase se estudiar:in de manera separada en el capitulo apropiado.
+Una definicion de lenguaje por lo general requerin'i no solamente que los errores
+est:iticos sean detectados por un compilador, sino tambien ciertos errores de ejecucion. Esto requiere que un compilador genere codigo extra, el cual realizani  pruebas de ejecucion apropiadas para garantizar que todos esos errores provocanin un evento aproð piado durante Ia ejecuci6n. El mas simple de tales eventos sera detener Ia ejecucion del programa. Sin embargo, a menudo esto noes  adecuado, y una definicion de lenguaje puede requerir la presencia de mecanismos para el manejo de excepciones. Estos pueden complicar sustancialmente Ia administracion de un sistema de ejecucion, especialmente si un programa puede continuar ejecutandose desde el punto donde ocurrio el error. No consideraremos Ia implementaci6n de un mecanismo asf, pero mostraremos como un compilador puede generar c6digo de prueba para asegurar que errores de ejecucion esð pecificados ocasionar:ln que se detenga Ia ejecuci6n.
+
+
+1.6 	ARRANQUE    AUTOMATICO   Y  PORTABILIDAD  	I
+
+Hemos analizado el lenguaje fuente y ellenguaje  objetivo como factores determinantes en Ia estructura de un compilador y Ia utilidad de separar cuestiones de lenguaje fuente y objeð tivo en etapas inicial y final. Pero no hemos mencionado el tercer Jenguaje involucrado en el proceso de construcci6n de compiladores: ellenguaje  en el que el compilador mismo esð ta escrito, Para que el compilador se ejecute inmediatamente, este lenguaje de implementað ci6n (o lenguaje antitrion) tendrfa que ser lenguaje de m:iquina. Asf fue en realidad como se escribieron los primeros compiladores, puesto que esencialmente  no existfan compið ladores todavfa. Un enfoque mas razonable en Ia actualidad es escribir el compilador en otro lenguaje para el cual ya exista un compilador. Si el compilador existente ya se ejecuta en Ia maquina obje.tivo, entonces solamente necesitamos compilar el nuevo compilador utilizanð do el compilador existente para obtener un programa ejecutable:
+
+
+
+
+
+Si el compilador existente para ellengme B se cjecuta en una maquina diferente de Ia rnað quina objetivo, entonces Ia situaci6n es un poco mas complicada. La compilacion produð ce entonces un compilador cruzado, es decir, un compilador que genera codigo objetivo para una maquina diferente de aquella en Ia que puede ejecutarse. Esta y otras situaciones mas complejas se describen mejor al esquematizar un compilador como un diagrama  T (llamado asi dcbido a su t<mna). Un compilador escrito en ellenguaje  H (por language host
+
+Arranque  automatico   y  portabilidad                                                                                                                                                         19
+
+
+o anfitri6n) que traduce lcnguaje S (de source o fuente) en lenguaje T (por language Target
+u objetivo) se dibuja como el siguiente diagrama T:
+
+
+
+
+
+
+
+Advierta que esto es equivalente a decir que el compilador se ejecutaen Ia "maquina" H (si H no es c6digo de maquina, entonces  Ia consideraremos  como c6digo ejecutable  para una maquina hipotetica). Tfpicamente, esperamos que H sea lo mismo que T (es decir, el comð pilador produce c6digo para Ia misma maquina que aquel\a en Ia que se ejecuta), pero noes necesario que este sea el caso.
+Los diagramas  T se pueden combinar  en dos maneras.  Primero,  si tenemos dos comð
+piladores que se ejecutan en Ia misma maquina H, uno de los cuales traduce lenguaje A al lenguaje B mientras que el otro traduce ellenguaje B allenguaje C, entonces podemos comð binarlos  dejando  que Ia salida del primero  sea Ia entrada  al segundo. El resultado  es un compilador  de A a C en Ia maquina H. Expresamos lo anterior como sigue:
+
+
+
+
+
+
+
+
+En segundo Iugar podemos utilizar un compilador de Ia "maquina" H a Ia "maquina" K para traducir el lenguaje de implementaci6n de otro compilador de H a K. Expresamos esto ultimo como sigue:
+
+
+
+
+
+
+
+
+    Ahora el primer escenario que describimos anteriormente,  es decir, utilizando un comð pilador existente para ellenguaje Ben  Ia maquina H para traducir un compilador de lenguað je A a H escrito en B, puede verse como el siguiente diagrama, el cual es precisamente  un caso especial del diagrama anterior:
+
+
+
+
+
+20	CAP.    I    I  INTRODUCCION
+
+
+   El segundo escenario que describimos (donde el compilador de lenguaje B se ejecuta en una maquina diferente, lo cual resulta en un compilador cruzado para A) puede describirse de manera similar como sigue:
+
+
+
+
+
+
+
+
+
+Es comun escribir un compilador en el mismo lenguaje que est:i por compilarse:
+
+
+
+
+
+
+
+
+
+Mientras que parece ser un enredo de circularidad (puesto que, si todavfa no existe compilað dor para ellenguaje fuente, el compilador mismo no puede ser compilado) existen ventajas importantes que se obtienen de este enfoque.
+   Considere, por ejemplo, como podemos enfocar el problema de Ia circularidad.  Podcmos escribir un compilador "r:ipido e impreciso" en lenguaje ensamblador, traduciendo solað mente aquellas caracteristicas de lenguaje que en realidad sean utilizadas en el compilador (teniendo, naturalmente, limitado nuestro uso de esas caracteristicas cuando escribamos el compilador "bueno"). Este compilador "nipido e impreciso" tambien puede producir c6dið go muy ineficiente (jsolamente necesita ser correcto!). Una vez que tenemos el compilador "rapido e impreciso" en ejecuci6n, lo utilizamos para compilar el compilador "bueno". Entonces volvemos a compilar el compilador "bueno" para producir Ia version final. Este proceso se denomina arranque automatico por transferencia. Este proceso se ilustra en las figuras !.2a y 1.2b.
+Despues del arranque automatico tenemos un compilador tanto en c6digo fuente como
+en c6digo ejecutable. La ventaja de esto es que cualquier mejoramiento a!c6digo fuente del
+
+
+
+
+
+Figura  L2a
+Primera  etapa  en  un  promo de  arranque  automatico
+
+1--------1
+-----1 ""' .\ 	I_H_;
+HI	I HI
+I
+
+1	l	l
+1
+/	-H_:	/
+Compilador escrito en su /	Compilador en ejecuci6n
+propio lenguaje A  /	pero ineficiente
+
+Compilador "rapido e imprecise" escrito en lenguaje de maquina
+
+
+
+
+
+Figura  L2b
+Segunda etapa  en  un proceso de arranque automatico
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+Figura 1.3a
+
+
+compilador  escrito  en  su
+
+lenguaje  y  compilador   de   muestra   TINY	21
+
+L'I'I :_ln,-_;: V
+/	'H'	/
+/	L      	 l 	/
+Compilador escrito en su	/		Version final propio lenguaie A  / ú	del compilador
+
+Compilador en ejecuci6n pero ineficiente
+(de Ia primera etapa)
+
+
+
+
+
+compilador pucde ser transferido inmediatamente a un compilador que este trabajando, aplið
+cando el mismo proceso de dopasos anterior.
+   Pero existe  otra ventaja. Transportar  ahora el compilador a una nueva computadora anfitri6n  solamente  requiere que Ia etapa final del c6digo  fuente  vuelva a cscribirse  para generar c6digo  para Ia nueva maquina. Este se compila entonces  utilizando el compilador antigun para producir un compilador cruzado, y el compilador  es nuevamente recompilado mediante el compilador cruzado para producir una version de trabajo para Ia nueva maquina. Esto se ilustra en las figuras 1.3a y 1.3b.
+
+
+YK'
+
+Transportacion  de  un
+
+-----]::::::>  .
+
+propio lenguaje fuente
+(paso I)
+
+
+
+
+
+
+
+
+
+Figura 1.3b Transportacion de  un compilador  mrito en su propio  lenguaje fuente (paso  2)
+
+H  I	H
+/	l_H_:--'	I
+C6digo tuente del compilador /	Comptlador cruzado redirigido a K	/
+Compilador original
+
+
+
+
+
+
+
+---- '""'	K.
+K I	K
+/	l_H_:	-' 	/
+C6digo fuente del compilador /	Compilador redirigido redirigido a K	/
+
+Compilador cruzado
+
+
+
+
+
+
+l.7 	LENGUAJE     Y  COMPILADOR  DE  MUESTRA TINY
+
+Un libro acerca de Ia construcci6n de compiladores estarfa incompleto sin cjemplos para cað
+da paso en el proccso de compilacion.  En muchos casos ilustrarcmos tecnicas con cjcmplos
+
+22	CAP.    I    I  INTROOUCCU)N
+
+
+que son sustrafdos de lenguajes existentes, tales como C, C++, Pascal y Ada. No obstante, estos ejemplos  no son sufieientes  para mostrar como se conjuntan  todas las partes de  un compilador.  Por eso, tambien es necesario exhibir un compilador  completo  y proporcionar un comentario  acerca de su funcionamiento.
+Este requerimiento (que se ha demostrado en un compilador  real) es dificil. Un compið
+lador "real",  es decir,  uno que esperarfamos utilizar  en la programacion cotidiana, tiene demasiado  detalle y serfa algo abrumador para estudiar dentro del marco conceptual  de un texto. Por otra parte, un compibdor para un lenguaje muy pequefio, cuyo listado pudiera comprimirse  en aproximadamente  10 paginas de texto, no podria esperar demostrar de mað nera adecuada todas las caracterfsticas que un compilador "real" necesita.
+   lntentaremos satisfacer estos requerimientos al proporcionar codigo fuente completo en C (ANSI)  para un lenguaje pequefio cuyo compilador se pueda comprender  facilmente una vez que las tecnicas se hayan entendido. Llamaremos a este lenguaje TINY y lo utilizaremos como un ejemplo ejecutable  para las tecnicas estudiadas  en cada capitulo.  El codigo  para su compilador  se analizan'i a medida que se cubran las tecnicas. En esta seccion proporcioð naremos una perspecti va general dellenguaje y su compilador. El codigo complete del comð pilador se recopila .:n d apendice B.
+    Un problema adicional es la elecci6n dellenguaje de m<iquina a utilizar como ellenguað je objetivo del compilador TINY. Nuevamente, la complejidad a!utilizar codigo de maquið na real para un procesador existente  hace que una seleccion  de esta naturaleza sea dificil. Pero la eleccion de un procesador especffico tambien tiene el efecto de limitar la ejecucion del codigo  objetivo  resultante  para estas  maquinas.  En cambio,  simplificamos el codigo objetivo  para que sea el lenguaje  ensamblador para un procesador hipotetico  simple,  el cual conoceremos como la maquina  TM (por las siglas  de "TINY  Machine"). Daremos un nipido  vistazo  a esta  maquina  aquf,  pero aplazaremos una descripcion mas extensa basta el capitulo 8 (generacion de codigo). Un listado del simulador de TM en C aparece en el apendice C.
+
+
+1.7.1       lenguaje    TINY
+
+Un programa en TINY tiene una estructura  muy simple: es simplemente  una secuencia  de sentencias separadas mediante signos de punto y coma en una sintaxis semejante ala  de Ada o Pascal. No hay procedimientos ni declaraciones. Todas las variables son variables enteras, y las variables son declaradas simplemente al asignar valores a las mismas (de modo pareð cido a FORTRAN o BASIC). Existen solamente dos sentencias de control: una sentencia "if' v una sentencia "repeat".  Ambas sentencias de control  pueden elias mismas contener secuencias de sentencias.  Una sentencia "if" tiene una parte opcional "else"  y debe termið narse mediante la palabra clave end. Tambien existen sentencias de lectura y escritura que realizan    ?tradalsalida. Los comentarios,  que no deben estar anidados, se permiten dentro de Haves tipograficas.
+   Las expresiones en TINY  tambien se encuentran limitadas  a expresiones aritmeticas enteras  y booleanas.  Una expresion booleana se compone de una comparacion de dos expresiones aritmeticas que utilizan cualesquiera de los dos operadores de comparacion
+< y =. Una expresion  aritmetica  puede involucrar  constantes enteras,  variables,  parenteð
+sis y cualquiera  de los cuatro  operadores enteros  +. -, * y  /'(division entera),  con  las propiedades matematicas habituales. Las expresiones booleanas  pueden  aparecer  solað
+mente como  pruebas en sentencias de control:  no hay variables  booleanas,  asignaci6n o
+E/S (entrada/salida).
+
+Lenguaje  y  compilador  de  muestra  TINY	13
+
+
+
+La figura 1.4 proporciona un programa de muestra en este lenguaje para Ia conocida funð
+cion factorial. Utilizaremos este programa como un ejemplo de ejecuci6n a !raves del texto.
+
+
+
+Figura 14
+Un   programa  en  lenguaje TINY  que  proporciona   a  Ia salida  el  factorial  de  su entrada
+
+{ Programa de mueatra en lenguaje TINY - calcula el factorial
+)
+
+read x; { introducir un entero )
+if x > 0 then { no calcule si x <=  0 )
+fact :=  1;
+repeat
+fact := fact * x;
+X   :=  X  -  1
+until x =    0;
+write fact { salida del factorial de x )
+end
+
+
+Aunque TINY carece de muchas caracterfsticas necesarias para los lenguajes de programað ci6n reales (procedimientos,  arreglos y valores de punto flotante son algunas de las omisioð nes mas serias),  todavfa es lo suficientemente  extenso  para ejemplificar  Ia mayorfa de las caracterfsticas esenciales de un compilador.
+
+
+1.7.2       Compilador   TINY
+
+El compilador  TINY se compone de los siguientes  archivos en C, donde enumeramos  los archivos  de cabecera  ("header") (por inclusion)  a Ia izquierda  y los archivos  de c6digo ("code")  a Ia derecha:
+
+
+globals.h 	main.c util.h 	util.c scan.h 	scan.c parse.h 	parse.c symtab.h 	symtab.c analyze.h 	analyze.c
+code.h 	 code.c cgen.h 	cgen.c
+
+El c6digo fuente para estos archivos se encuentra listado en el apendice B, con numeros de linea yen  el orden dado, excepto que main.c esta Jistado antes de globals.h. El archið vo de cabecera globals.h est{i incluido en todos los archivos de c6digo. Contiene las deð finiciones de los tipos de d tos  y variables globales utilizadas a Jo largo del compilador.  El archivo main.c contiene el programa principal que controla el compilador,  y asigna e ini- ú cializa las variables globales. Los archivos restantes se componen  de pares de archivos de cabecera!c6digo, con los prototipos de funci6n disponibles externamente dados en el archið vo de cabecera e implementados (posiblemente con funciones locales cstaticas adicionales) en el archivo de c6digo asociado. Los archivos scan, parse, analyze y cgen corresponð den exactarnente a las fases del analizador Jexico, analizador sintactico, analizador semantico
+y generador  de c6digo de Ia figura 1.1. Los archivos  util contienen  funciones de utileð
+rfas necesarias para generar Ia rcpresentacir\n intcrna del c6digo fuente (c! :lrbo! sintktico)
+
+24	CAP. I I  INTRODUCC16N
+
+
+y exhibir Ia informacion de error y listado. Los archives symtab contienen una implemenð tacion de tabla de calculo de direccion de una tabla de simbolos adecuada  para usarse con TINY. Los archives code contienen utilerfas para Ia generacion de codigo que son depenð dientes de Ia maquina objetivo (Ia maquina TM, descrita en Ia seccion 1.7.3). Los compoð nentes restantes de Ia figura 1.1 se encuentran ausentes: no hay tabla de literates o manejað dor de error por separado y no hay fases de optimizacion. Tampoco  hay codigo intermedio separado del arbol sintactico. Adicionalmente, Ia tabla de sfmbolos interactua solamente con el analizador semantico y el generador de codigo (de modo que aplazaremos  un analisis de esto hasta el capitulo 6).
+Para reducir Ia interaccion entre estes archivos, tambien hemos hecho el compilador de
+cuatro  pasadas:  Ia primera  pasada se compone  del analizador  lexico  y el analizador  sinð tactico,  lo que construye el arbol sintactico; Ia segunda y tercera pasadas se encargan  del amilisis semantico, con Ia segunda pasada construyendo  Ia tabla de sfmbolos mientras que Ia tercera pasada realiza Ia verificacion de tipos; Ia ultima pasada es el generador de codigo. El codigo en main.c que controla estas pasadas es particularmente  simple. lgnorando las banderas y Ia compilacion condicional, el codigo central es como sigue (veanse las lineas 69,
+77, 79 y 94 del apendice B):
+
+syntaxTree =  parse(); buildSymtab(syntaxTree); typeCheck(syntaxTree); codeGen(syntaxTree,codefile);
+Por flexibilidad, tambien integramos banderas de compilacion condicional que hacen posible construir compiladores parciales. Las banderas, con sus efectos, se describen a continuacion:
+
+
+
+MARCA
+0 BANDERA
+NO_PARSE
+
+ARCHIVOS NECESARIOS  PARA
+SU  EFECTO Sl  SE ACTIVA	 COMPILACION (ACUMULATIVOS) Construye un compilador   globals.h,  main.c, solamente de analisis 	util.h, util.c, scan.h, texico. 	 scan.c
+
+NO_ANALYZE	Construye un compilador   parse.h,   parse.c
+que tlnicamente realiza an:ilisis sintactico y lexico.
+NO_CODE	Construye un compilador 	 symtab.h,  symtab.c, que realiza el analisis 	analyze.h,  analyze.c semantico pero no
+genera codigo.
+
+
+   Aunque  este disefio para .el compilador  TINY es algo poco realista,  tiene Ia ventaja pedagogica de que los archives por separado corresponden aproximadamente a las fases, y se pueden analizar (asf como compilar y ejecutar) de manera individual en los capftulos que siguen.
+
