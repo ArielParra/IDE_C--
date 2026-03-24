@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<style-scheme id="dark"
+              name="Dark"
+              version="1.0">
+
+  <!-- fondo general -->
+  <style name="text"
+         foreground="#e8d8b0"
+         background="#2b2620"/>
+
+  <!-- palabras reservadas -->
+  <style name="def:keyword"
+         foreground="#c2a96a"
+         bold="true"/>
+
+  <!-- identificadores -->
+  <style name="def:identifier"
+         foreground="#e8d8b0"/>
+
+  <!-- numeros -->
+  <style name="def:number"
+         foreground="#b89c6d"/>
+
+  <!-- comentarios -->
+  <style name="def:comment"
+         foreground="#7a8c6f"
+         italic="true"/>
+
+  <!-- operadores -->
+  <style name="def:operator"
+         foreground="#c97b5c"/>
+
+  <!-- statements / logicos -->
+  <style name="def:statement"
+         foreground="#8fa67a"/>
+
+  <!-- simbolos -->
+  <style name="def:special-char"
+         foreground="#d6c6a1"/>
+
+  <!-- strings -->
+  <style name="def:string"
+         foreground="#d4b06a"/>
+
+</style-scheme>

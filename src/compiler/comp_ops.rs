@@ -1,4 +1,6 @@
-use std::process::Command;
+use std::{cell::RefCell, path::PathBuf, process::Command, rc::Rc};
+
+use gtk::ApplicationWindow;
 
 pub fn ejecutar_compilador(
     window: &ApplicationWindow,

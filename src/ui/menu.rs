@@ -1,4 +1,4 @@
-use gtk::prelude::*;
+use gtk::{TextView, prelude::*};
 use gtk::{Application, ApplicationWindow, PopoverMenuBar, gio};
 use std::cell::RefCell;
 use std::process::{Command, Stdio};
@@ -8,12 +8,15 @@ use std::path::PathBuf;
 use std::rc::Rc;
 
 use crate::file_manager;
+use crate::compiler;
 
 pub fn build_menu(
     app: &Application,
     window: &ApplicationWindow,
     buffer: &impl IsA<gtk::TextBuffer>,
     file_state: Rc<RefCell<Option<PathBuf>>>,
+    lexic_view: Rc<RefCell<TextView>>,
+    errors_view: Rc<RefCell<TextView>>,
 ) -> PopoverMenuBar {
 
     // === Menu Model ===
@@ -137,6 +140,33 @@ pub fn build_menu(
         app_clone.quit();
     });
     app.add_action(&exit_action);
+
+    // LEXICAL ANALYSIS
+    let buffer_clone = text_buffer.clone();
+    let lex_view_clone = lexic_view.clone();
+    let err_view_clone = errors_view.clone();
+
+    let lexical_action = gio::SimpleAction::new("lexical", None);
+
+    lexical_action.connect_activate(move |_, _| {
+        let texto = buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
+
+        let (tokens, errores) = compiler::lexer::analizar(&texto);
+
+        let lex_buffer = lex_view_clone.borrow().buffer();
+        lex_buffer.set_text("");
+        for t in &tokens {
+            lex_buffer.insert_at_cursor(&format!("{}: '{}' ({}:{})\n",
+                t.tipo, t.lexema, t.linea, t.columna));
+        }
+
+        let err_buffer = err_view_clone.borrow().buffer();
+        err_buffer.set_text("");
+        for e in &errores {
+            err_buffer.insert_at_cursor(&format!("{} ({}:{})\n", e.mensaje, e.linea, e.columna));
+        }
+    });
+    app.add_action(&lexical_action);
 
     // COMPILE
     /*let window_clone = window.clone();

@@ -4,5 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+glib = "0.22.3"
 gtk = { package = "gtk4", version = "0.7", features = ["v4_10"]}
 sourceview5 = "0.7"
