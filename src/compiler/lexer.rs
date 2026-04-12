@@ -304,7 +304,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                 errores.push(ErrorLexico {
                     message: format!("Malformed number: '{}'", lexema_error),
                     linea: start_linea,
-                    columna: col,
+                    columna,
                 });
                 i += 1;
                 columna += 1;

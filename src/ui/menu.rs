@@ -67,6 +67,28 @@ pub fn build_menu(
         editor_view.grab_focus();
     }
 
+    fn lexical_token_color(tipo: &str, lexema: &str) -> &'static str {
+        match tipo {
+            "MAIN" | "IF" | "ELSE" | "END" | "DO" | "WHILE" | "FOR" | "SWITCH"
+            | "CASE" | "RETURN" | "VOID" | "INT_T" | "FLOAT_T" | "CHAR_T" | "BOOL_T"
+            | "TRUE" | "FALSE" | "CIN" | "COUT" | "INCLUDE" | "DEFINE" | "STRUCT"
+            | "BREAK" | "CONTINUE" => "#569cd6",
+            "INT" | "FLOAT" => "#b5cea8",
+            "STRING" | "CHAR" => "#ce9178",
+            "ID" => "#ff57f4ff",
+            "SYM" => "#d7ba7d",
+            "ARIT" | "OP" | "ASIG" => "#f44747",
+            "REL" => {
+                if lexema == "=" {
+                    "#f44747"
+                } else {
+                    "#569cd6"
+                }
+            }
+            _ => "#ffffff",
+        }
+    }
+
     // === Menu Model ===
     let menu_model = gio::Menu::new();
 
@@ -203,9 +225,30 @@ pub fn build_menu(
 
         let lex_buffer = lex_view_clone.borrow().buffer();
         lex_buffer.set_text("");
+        let lex_link_tag = lex_buffer
+            .create_tag(
+                None,
+                &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)],
+            )
+            .expect("failed to create lexical link tag");
         for t in &tokens {
-            lex_buffer.insert_at_cursor(&format!("{}: '{}' ({}:{})\n",
-                t.tipo, t.lexema, t.linea, t.columna));
+            let token_color = lexical_token_color(&t.tipo, &t.lexema);
+            let token_tag = lex_buffer
+                .create_tag(None, &[("foreground", &token_color)])
+                .expect("failed to create lexical token tag");
+
+            let mut iter = lex_buffer.end_iter();
+            lex_buffer.insert_with_tags(&mut iter, &t.tipo, &[&token_tag]);
+            lex_buffer.insert(&mut iter, ": '");
+            lex_buffer.insert_with_tags(&mut iter, &t.lexema, &[&token_tag]);
+            lex_buffer.insert(&mut iter, "' ");
+
+            let mut link_iter = lex_buffer.end_iter();
+            let link_text = format!("({}:{})", t.linea, t.columna);
+            lex_buffer.insert_with_tags(&mut link_iter, &link_text, &[&lex_link_tag]);
+
+            let mut newline_iter = lex_buffer.end_iter();
+            lex_buffer.insert(&mut newline_iter, "\n");
         }
 
         let err_buffer = err_view_clone.borrow().buffer();
@@ -229,6 +272,29 @@ pub fn build_menu(
         }
     });
     app.add_action(&lexical_action);
+
+    let lexic_textview_for_nav = lexic_view.borrow().clone();
+    let lexic_buffer_for_nav = lexic_textview_for_nav.buffer();
+    let editor_buffer_for_lex_nav = text_buffer.clone();
+    let editor_view_for_lex_nav = editor_view.clone();
+
+    lexic_buffer_for_nav.connect_mark_set(move |buf, iter, mark| {
+        if mark.name().as_deref() != Some("insert") {
+            return;
+        }
+
+        let mut start = *iter;
+        start.set_line_offset(0);
+
+        let mut end = start;
+        end.forward_to_line_end();
+
+        let line_text = buf.text(&start, &end, true).to_string();
+
+        if let Some((linea, columna)) = parse_error_position(&line_text) {
+            go_to_error_position(&editor_view_for_lex_nav, &editor_buffer_for_lex_nav, linea, columna);
+        }
+    });
 
     // Navigate to editor when clicking on a lexical error line with format: "... (line:column)"
     let errors_textview_for_nav = errors_view.borrow().clone();
