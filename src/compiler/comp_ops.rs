@@ -2,10 +2,11 @@ use std::{cell::RefCell, path::PathBuf, process::Command, rc::Rc};
 
 use gtk::ApplicationWindow;
 
+#[allow(dead_code)]
 pub fn ejecutar_compilador(
-    window: &ApplicationWindow,
-    buffer: gtk::TextBuffer,
-    current_file: Rc<RefCell<Option<PathBuf>>>,
+    _window: &ApplicationWindow,
+    _buffer: gtk::TextBuffer,
+    _current_file: Rc<RefCell<Option<PathBuf>>>,
 ) {
     let output = Command::new("./compilador.exe")
         .arg("archivo.cmm") // si necesita argumentos

@@ -149,6 +149,8 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
         // ---------------- COMENTARIO BLOQUE /* */ ----------------
         if i + 1 < chars.len() && chars[i] == '/' && chars[i+1] == '*' {
+            let start_linea = linea;
+            let start_col = columna;
             i += 2;
             columna += 2;
             
@@ -163,6 +165,15 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                 i += 1;
             }
             
+            if i + 1 >= chars.len() {
+                errores.push(ErrorLexico {
+                    mensaje: "Comentario de bloque sin cerrar".into(),
+                    linea: start_linea,
+                    columna: start_col,
+                });
+                continue;
+            }
+            
             i += 2;
             columna += 2;
             
@@ -175,13 +186,29 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
             let col = columna;
             let start = i;
+            let start_linea = linea;
 
             i += 1;
             columna += 1;
 
             while i < chars.len() && chars[i] != '"' {
+                if chars[i] == '\n' {
+                    linea += 1;
+                    columna = 1;
+                } else {
+                    columna += 1;
+                }
                 i += 1;
-                columna += 1;
+            }
+
+            if i >= chars.len() {
+                errores.push(ErrorLexico {
+                    mensaje: format!("String sin cerrar: '{}'", chars[start..].iter().collect::<String>()),
+                    linea: start_linea,
+                    columna: col,
+                });
+                i += 1;
+                continue;
             }
 
             i += 1;
@@ -192,7 +219,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             tokens.push(Token {
                 tipo: "STRING".into(),
                 lexema,
-                linea,
+                linea: start_linea,
                 columna: col,
             });
 
@@ -205,13 +232,29 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
             let col = columna;
             let start = i;
+            let start_linea = linea;
 
             i += 1;
             columna += 1;
 
             while i < chars.len() && chars[i] != '\'' {
+                if chars[i] == '\n' {
+                    linea += 1;
+                    columna = 1;
+                } else {
+                    columna += 1;
+                }
                 i += 1;
-                columna += 1;
+            }
+
+            if i >= chars.len() {
+                errores.push(ErrorLexico {
+                    mensaje: format!("Char sin cerrar: '{}'", chars[start..].iter().collect::<String>()),
+                    linea: start_linea,
+                    columna: col,
+                });
+                i += 1;
+                continue;
             }
 
             i += 1;
@@ -222,7 +265,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             tokens.push(Token {
                 tipo: "CHAR".into(),
                 lexema,
-                linea,
+                linea: start_linea,
                 columna: col,
             });
 
@@ -310,13 +353,25 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                 "end" => "END",
                 "do" => "DO",
                 "while" => "WHILE",
+                "for" => "FOR",
                 "switch" => "SWITCH",
                 "case" => "CASE",
+                "return" => "RETURN",
+                "void" => "VOID",
                 "int" => "INT_T",
                 "float" => "FLOAT_T",
+                "char" => "CHAR_T",
+                "bool" => "BOOL_T",
+                "true" => "TRUE",
+                "false" => "FALSE",
                 "main" => "MAIN",
                 "cin" => "CIN",
                 "cout" => "COUT",
+                "include" => "INCLUDE",
+                "define" => "DEFINE",
+                "struct" => "STRUCT",
+                "break" => "BREAK",
+                "continue" => "CONTINUE",
 
                 _ => "ID",
             };
@@ -373,10 +428,23 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
         // ---------------- REL / LOG / ASIG ----------------
 
-        if "=<>!".contains(c) {
+        if c == '=' || c == '<' || c == '>' || c == '!' {
+
+            if i + 1 < chars.len() && chars[i + 1] == '=' {
+                let dos: String = chars[i..i+2].iter().collect();
+                tokens.push(Token {
+                    tipo: "REL".into(),
+                    lexema: dos,
+                    linea,
+                    columna,
+                });
+                i += 2;
+                columna += 2;
+                continue;
+            }
 
             tokens.push(Token {
-                tipo: "REL".into(),
+                tipo: if c == '=' { "ASIG" } else { "REL" }.into(),
                 lexema: c.to_string(),
                 linea,
                 columna,
