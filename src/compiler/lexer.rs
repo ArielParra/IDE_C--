@@ -8,7 +8,7 @@ pub struct Token {
 
 #[derive(Debug)]
 pub struct ErrorLexico {
-    pub mensaje: String,
+    pub message: String,
     pub linea: usize,
     pub columna: usize,
 }
@@ -24,31 +24,30 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
     let chars: Vec<char> = text.chars().collect();
     let mut i = 0;
 
-    // Función auxiliar para mirar el siguiente caracter no-whitespace
     fn lookahead_skip_whitespace(chars: &[char], start: usize) -> (Option<char>, usize, usize, usize) {
         let mut i = start;
-        let mut saltos_linea = 0;
-        let mut espacios = 0;
+        let mut line_breaks = 0;
+        let mut spaces = 0;
         
         while i < chars.len() && (chars[i] == ' ' || chars[i] == '\t' || chars[i] == '\n') {
             if chars[i] == '\n' {
-                saltos_linea += 1;
-                espacios = 0;
+                line_breaks += 1;
+                spaces = 0;
             } else {
-                espacios += 1;
+                spaces += 1;
             }
             i += 1;
         }
         
-        let siguiente = if i < chars.len() { Some(chars[i]) } else { None };
-        (siguiente, i, saltos_linea, espacios)
+        let next = if i < chars.len() { Some(chars[i]) } else { None };
+        (next, i, line_breaks, spaces)
     }
 
     while i < chars.len() {
 
         let c = chars[i];
 
-        // ---------------- ESPACIOS ----------------
+        // ---------------- WHITESPACE ----------------
 
         if c == ' ' || c == '\t' {
             columna += 1;
@@ -63,14 +62,12 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             continue;
         }
 
-        // ---------------- OPERADORES INCREMENTO/DECREMENTO CON LOOKAHEAD ----------------
+        // ---------------- INCREMENT/DECREMENT OPERATORS WITH LOOKAHEAD ----------------
 
-        // Detectar ++ con saltos de línea y espacios intermedios
         if c == '+' {
-            let (sig, pos_sig, saltos, espacios) = lookahead_skip_whitespace(&chars, i + 1);
+            let (next, pos_next, breaks, spaces) = lookahead_skip_whitespace(&chars, i + 1);
             
-            if let Some('+') = sig {
-                // Es un operador ++ aunque haya saltos de línea
+            if let Some('+') = next {
                 tokens.push(Token {
                     tipo: "OP".into(),
                     lexema: "++".into(),
@@ -78,17 +75,15 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                     columna,
                 });
                 
-                // Actualizar posición saltando los caracteres intermedios
-                i = pos_sig + 1;
-                linea += saltos;
-                if saltos > 0 {
-                    columna = 1 + espacios;
+                i = pos_next + 1;
+                linea += breaks;
+                if breaks > 0 {
+                    columna = 1 + spaces;
                 } else {
-                    columna += 2 + espacios;
+                    columna += 2 + spaces;
                 }
                 continue;
             } else {
-                // Es un + normal
                 tokens.push(Token {
                     tipo: "ARIT".into(),
                     lexema: "+".into(),
@@ -101,11 +96,10 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             }
         }
         
-        // Detectar -- con saltos de línea y espacios intermedios
         if c == '-' {
-            let (sig, pos_sig, saltos, espacios) = lookahead_skip_whitespace(&chars, i + 1);
+            let (next, pos_next, breaks, spaces) = lookahead_skip_whitespace(&chars, i + 1);
             
-            if let Some('-') = sig {
+            if let Some('-') = next {
                 tokens.push(Token {
                     tipo: "OP".into(),
                     lexema: "--".into(),
@@ -113,12 +107,12 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                     columna,
                 });
                 
-                i = pos_sig + 1;
-                linea += saltos;
-                if saltos > 0 {
-                    columna = 1 + espacios;
+                i = pos_next + 1;
+                linea += breaks;
+                if breaks > 0 {
+                    columna = 1 + spaces;
                 } else {
-                    columna += 2 + espacios;
+                    columna += 2 + spaces;
                 }
                 continue;
             } else {
@@ -134,7 +128,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             }
         }
 
-       // ---------------- COMENTARIO LINEA // ----------------
+       // ---------------- LINE COMMENT // ----------------
         if i + 1 < chars.len() && chars[i] == '/' && chars[i+1] == '/' {
             i += 2;
             columna += 2;
@@ -147,7 +141,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             continue;
         }
 
-        // ---------------- COMENTARIO BLOQUE /* */ ----------------
+        // ---------------- BLOCK COMMENT /* */ ----------------
         if i + 1 < chars.len() && chars[i] == '/' && chars[i+1] == '*' {
             let start_linea = linea;
             let start_col = columna;
@@ -167,7 +161,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             
             if i + 1 >= chars.len() {
                 errores.push(ErrorLexico {
-                    mensaje: "Comentario de bloque sin cerrar".into(),
+                    message: "Unclosed block comment".into(),
                     linea: start_linea,
                     columna: start_col,
                 });
@@ -203,7 +197,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
             if i >= chars.len() {
                 errores.push(ErrorLexico {
-                    mensaje: format!("String sin cerrar: '{}'", chars[start..].iter().collect::<String>()),
+                    message: format!("Unclosed string: '{}'", chars[start..].iter().collect::<String>()),
                     linea: start_linea,
                     columna: col,
                 });
@@ -249,7 +243,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
             if i >= chars.len() {
                 errores.push(ErrorLexico {
-                    mensaje: format!("Char sin cerrar: '{}'", chars[start..].iter().collect::<String>()),
+                    message: format!("Unclosed char: '{}'", chars[start..].iter().collect::<String>()),
                     linea: start_linea,
                     columna: col,
                 });
@@ -272,7 +266,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             continue;
         }
 
-                // ---------------- NUMERO ----------------
+                // ---------------- NUMBER ----------------
 
         if c.is_ascii_digit() {
 
@@ -280,8 +274,8 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             let col = columna;
             let start_linea = linea;
 
-            let mut punto = false;
-            let mut error_punto = false;
+            let mut has_dot = false;
+            let mut dot_error = false;
 
             while i < chars.len() {
 
@@ -290,15 +284,13 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                     columna += 1;
                 }
 
-                else if chars[i] == '.' && !punto {
-                    // Verificar si después del punto hay dígitos
+                else if chars[i] == '.' && !has_dot {
                     if i+1 < chars.len() && chars[i+1].is_ascii_digit() {
-                        punto = true;
+                        has_dot = true;
                         i += 1;
                         columna += 1;
                     } else {
-                        // Punto sin dígitos después -> error
-                        error_punto = true;
+                        dot_error = true;
                         break;
                     }
                 }
@@ -307,10 +299,10 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                 }
             }
 
-            if error_punto {
+            if dot_error {
                 let lexema_error: String = chars[start..=i].iter().collect();
                 errores.push(ErrorLexico {
-                    mensaje: format!("Número mal formado: '{}'", lexema_error),
+                    message: format!("Malformed number: '{}'", lexema_error),
                     linea: start_linea,
                     columna: col,
                 });
@@ -322,7 +314,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             let lexema: String = chars[start..i].iter().collect();
 
             tokens.push(Token {
-                tipo: if punto { "FLOAT" } else { "INT" }.into(),
+                tipo: if has_dot { "FLOAT" } else { "INT" }.into(),
                 lexema,
                 linea: start_linea,
                 columna: col,
@@ -386,7 +378,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             continue;
         }
 
-        // ---------------- DOBLES (sin lookahead para otros operadores) ----------------
+        // ---------------- DOUBLE OPERATORS (no lookahead for other operators) ----------------
 
         if i + 1 < chars.len() {
 
@@ -410,7 +402,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             }
         }
 
-        // ---------------- ARITMETICOS ----------------
+        // ---------------- ARITHMETIC ----------------
 
         if "*/%^".contains(c) {
 
@@ -474,7 +466,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
         // ---------------- ERROR ----------------
 
         errores.push(ErrorLexico {
-            mensaje: format!("Caracter invalido {}", c),
+            message: format!("Invalid character {}", c),
             linea,
             columna,
         });

@@ -3,9 +3,9 @@ use sourceview5::{LanguageManager, StyleSchemeManager};
 
 // ================= LANGUAGE + STYLE =================
 
-// Configura el lenguaje de programación y el esquema de colores del editor.
-// Busca los archivos de lenguaje y estilo en recursos, carga el lenguaje "cmm" 
-// y el tema "dark", y devuelve ambos.
+// Configures the programming language and color scheme of the editor.
+// Searches for language and style files in resources, loads the "cmm" language
+// and the "dark" theme, and returns both.
 
 pub fn create_language_and_style(
 ) -> (

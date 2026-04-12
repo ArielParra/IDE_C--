@@ -4,8 +4,8 @@ use gtk::{Box,Notebook, Orientation, Paned, ScrolledWindow};
 
 // ================= LAYOUT =================
 
-// Organiza visualmente los componentes del IDE en paneles.
-// Coloca el editor a la izquierda, debug a la derecha y errores abajo en un Paned vertical principal.
+// Organizes the IDE components visually in panels.
+// Places the editor on the left, debug on the right and errors at the bottom in a main vertical Paned.
 
 
 pub fn create_layout(

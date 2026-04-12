@@ -1,11 +1,13 @@
 use gtk::{TextView, prelude::*};
 use gtk::{Application, ApplicationWindow, PopoverMenuBar, gio};
+use gtk::pango::Underline;
 use std::cell::RefCell;
 use std::process::{Command, Stdio};
 use std::io::{BufRead, BufReader};
 use std::thread;
 use std::path::PathBuf;
 use std::rc::Rc;
+use sourceview5::View as SourceView;
 
 use crate::file_manager;
 use crate::compiler;
@@ -14,10 +16,56 @@ pub fn build_menu(
     app: &Application,
     window: &ApplicationWindow,
     buffer: &impl IsA<gtk::TextBuffer>,
+    editor_view: SourceView,
     file_state: Rc<RefCell<Option<PathBuf>>>,
     lexic_view: Rc<RefCell<TextView>>,
     errors_view: Rc<RefCell<TextView>>,
 ) -> PopoverMenuBar {
+
+    fn parse_error_position(line: &str) -> Option<(usize, usize)> {
+        let open = line.rfind('(')?;
+        let close = line.rfind(')')?;
+
+        if close <= open + 1 {
+            return None;
+        }
+
+        let pos = &line[open + 1..close];
+        let (line_s, col_s) = pos.split_once(':')?;
+
+        let line_n = line_s.trim().parse::<usize>().ok()?;
+        let col_n = col_s.trim().parse::<usize>().ok()?;
+
+        if line_n == 0 || col_n == 0 {
+            return None;
+        }
+
+        Some((line_n, col_n))
+    }
+
+    fn go_to_error_position(editor_view: &SourceView, editor_buffer: &gtk::TextBuffer, line: usize, col: usize) {
+        let line_idx = (line - 1) as i32;
+        let col_idx = (col - 1) as i32;
+
+        let mut iter = match editor_buffer.iter_at_line_offset(line_idx, col_idx) {
+            Some(it) => it,
+            None => match editor_buffer.iter_at_line(line_idx) {
+                Some(it) => it,
+                None => return,
+            },
+        };
+
+        editor_buffer.place_cursor(&iter);
+
+        let mut end = iter;
+        if !end.ends_line() {
+            end.forward_char();
+        }
+        editor_buffer.select_range(&iter, &end);
+
+        editor_view.scroll_to_iter(&mut iter, 0.2, false, 0.0, 0.0);
+        editor_view.grab_focus();
+    }
 
     // === Menu Model ===
     let menu_model = gio::Menu::new();
@@ -41,23 +89,23 @@ pub fn build_menu(
     edit_menu.append(Some("Copy"), Some("app.copy"));
     //BUILD & DEBUG
     let build_debug_menu = gio::Menu::new();
-    build_debug_menu.append(Some("Compile1"), Some("app.compile1"));//probaremos en la seccion compilar esta funcion
+    build_debug_menu.append(Some("Compile1"), Some("app.compile1")); // Will test in the compile section
     build_debug_menu.append(Some("Run"), Some("app.run"));
     build_debug_menu.append(Some("Debug"), Some("app.debug"));
 
-    //LEXICO
+    //LEXICAL
     let lexico_menu = gio::Menu::new();
     lexico_menu.append(Some("Run Lexical Analysis"), Some("app.lexical"));
 
-    //SINTACTICO
+    //SYNTAX
     let sintactico_menu = gio::Menu::new();
     sintactico_menu.append(Some("Run Syntax Analysis"), Some("app.syntax"));
 
-    //SEMANTICO
+    //SEMANTIC
     let semantico_menu = gio::Menu::new();
     semantico_menu.append(Some("Run Semantic Analysis"), Some("app.semantic"));
 
-    //COMPILAR
+    //COMPILE
     let compilar_menu = gio::Menu::new();
     compilar_menu.append(Some("Compile"), Some("app.c--compiler"));
     compilar_menu.append(Some("Lexical Analysis"), Some("app.lexico"));
@@ -162,11 +210,49 @@ pub fn build_menu(
 
         let err_buffer = err_view_clone.borrow().buffer();
         err_buffer.set_text("");
+        let error_link_tag = err_buffer
+            .create_tag(
+                None,
+                &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)],
+            )
+            .expect("failed to create error link tag");
         for e in &errores {
-            err_buffer.insert_at_cursor(&format!("{} ({}:{})\n", e.mensaje, e.linea, e.columna));
+            let mut message_iter = err_buffer.end_iter();
+            err_buffer.insert(&mut message_iter, &format!("{} ", e.message));
+
+            let mut link_iter = err_buffer.end_iter();
+            let link_text = format!("({}:{})", e.linea, e.columna);
+            err_buffer.insert_with_tags(&mut link_iter, &link_text, &[&error_link_tag]);
+
+            let mut newline_iter = err_buffer.end_iter();
+            err_buffer.insert(&mut newline_iter, "\n");
         }
     });
     app.add_action(&lexical_action);
+
+    // Navigate to editor when clicking on a lexical error line with format: "... (line:column)"
+    let errors_textview_for_nav = errors_view.borrow().clone();
+    let errors_buffer_for_nav = errors_textview_for_nav.buffer();
+    let editor_buffer_for_nav = text_buffer.clone();
+    let editor_view_for_nav = editor_view.clone();
+
+    errors_buffer_for_nav.connect_mark_set(move |buf, iter, mark| {
+        if mark.name().as_deref() != Some("insert") {
+            return;
+        }
+
+        let mut start = *iter;
+        start.set_line_offset(0);
+
+        let mut end = start;
+        end.forward_to_line_end();
+
+        let line_text = buf.text(&start, &end, true).to_string();
+
+        if let Some((linea, columna)) = parse_error_position(&line_text) {
+            go_to_error_position(&editor_view_for_nav, &editor_buffer_for_nav, linea, columna);
+        }
+    });
 
     // COMPILE
     /*let window_clone = window.clone();

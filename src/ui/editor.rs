@@ -6,8 +6,8 @@ use sourceview5::{Buffer, LanguageManager, StyleSchemeManager, View};
 
 // ================= EDITOR =================
 
-// Crea el editor de código: buffer, vista y contenedor con scroll.
-// Aplica lenguaje, esquema de colores, números de línea y resaltado de línea actual.
+// Creates the code editor: buffer, view and scroll container.
+// Applies language, color scheme, line numbers and current line highlighting.
 
 pub fn create_editor(
     _lm: LanguageManager,

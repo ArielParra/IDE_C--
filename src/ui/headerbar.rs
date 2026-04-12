@@ -4,8 +4,8 @@ use gtk::{Application, Button, HeaderBar};
 
 // ================= HEADERBAR =================
 
-// Crea la barra de herramientas superior con botones de acciones (nuevo, abrir, guardar, ejecutar, salir...).
-// Conecta cada botón a la acción correspondiente de la aplicación.
+// Creates the top toolbar with action buttons (new, open, save, execute, exit...).
+// Connects each button to the corresponding application action.
 
 pub fn create_headerbar(app: &Application) -> HeaderBar {
 

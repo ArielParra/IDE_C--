@@ -5,8 +5,8 @@ use std::cell::RefCell;
 
 // ================= NOTEBOOKS =================
 
-// Crea los notebooks para depuración y errores.
-// Devuelve además referencias a los TextView que se usarán para mostrar tokens y errores.
+// Creates notebooks for debugging and errors.
+// Also returns references to the TextViews that will be used to display tokens and errors.
 pub fn create_notebooks() -> (
     Notebook,
     Rc<RefCell<TextView>>,

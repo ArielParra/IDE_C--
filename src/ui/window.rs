@@ -5,7 +5,6 @@ use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 
-// si usas tu módulo menu
 use super::editor::*;
 use super::layout::*;
 use super::headerbar::*;
@@ -15,9 +14,9 @@ use super::menu::*;
 
 // ================= BUILD UI =================
 
-// Construye toda la interfaz del IDE:
-// ventana principal, editor, notebooks, layout, header bar y menú.
-// Ensambla todo en un Box vertical y muestra la ventana.
+// Builds the entire IDE interface:
+// main window, editor, notebooks, layout, header bar and menu.
+// Assembles everything in a vertical Box and shows the window.
 
 pub fn build_ui(app: &Application) {
 
@@ -31,7 +30,7 @@ pub fn build_ui(app: &Application) {
 
    let (lm, sm, lang, scheme) = create_language_and_style();
 
-   let (buffer, _view, codigo) =
+    let (buffer, view, codigo) =
     create_editor(lm, sm, lang, scheme);
 
    let (debugnotebook, lexic_textview, errorsnotebook, errors_textview) = create_notebooks();
@@ -51,6 +50,7 @@ pub fn build_ui(app: &Application) {
         app,
         &window,
         &buffer,
+        view.clone(),
         file_state,
         lexic_textview.clone(),
         errors_textview.clone(),
