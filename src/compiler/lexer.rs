@@ -24,6 +24,26 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
     let chars: Vec<char> = text.chars().collect();
     let mut i = 0;
 
+    // Función auxiliar para mirar el siguiente caracter no-whitespace
+    fn lookahead_skip_whitespace(chars: &[char], start: usize) -> (Option<char>, usize, usize, usize) {
+        let mut i = start;
+        let mut saltos_linea = 0;
+        let mut espacios = 0;
+        
+        while i < chars.len() && (chars[i] == ' ' || chars[i] == '\t' || chars[i] == '\n') {
+            if chars[i] == '\n' {
+                saltos_linea += 1;
+                espacios = 0;
+            } else {
+                espacios += 1;
+            }
+            i += 1;
+        }
+        
+        let siguiente = if i < chars.len() { Some(chars[i]) } else { None };
+        (siguiente, i, saltos_linea, espacios)
+    }
+
     while i < chars.len() {
 
         let c = chars[i];
@@ -43,62 +63,109 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             continue;
         }
 
-        // ---------------- COMENTARIO LINEA // ----------------
+        // ---------------- OPERADORES INCREMENTO/DECREMENTO CON LOOKAHEAD ----------------
 
+        // Detectar ++ con saltos de línea y espacios intermedios
+        if c == '+' {
+            let (sig, pos_sig, saltos, espacios) = lookahead_skip_whitespace(&chars, i + 1);
+            
+            if let Some('+') = sig {
+                // Es un operador ++ aunque haya saltos de línea
+                tokens.push(Token {
+                    tipo: "OP".into(),
+                    lexema: "++".into(),
+                    linea,
+                    columna,
+                });
+                
+                // Actualizar posición saltando los caracteres intermedios
+                i = pos_sig + 1;
+                linea += saltos;
+                if saltos > 0 {
+                    columna = 1 + espacios;
+                } else {
+                    columna += 2 + espacios;
+                }
+                continue;
+            } else {
+                // Es un + normal
+                tokens.push(Token {
+                    tipo: "ARIT".into(),
+                    lexema: "+".into(),
+                    linea,
+                    columna,
+                });
+                i += 1;
+                columna += 1;
+                continue;
+            }
+        }
+        
+        // Detectar -- con saltos de línea y espacios intermedios
+        if c == '-' {
+            let (sig, pos_sig, saltos, espacios) = lookahead_skip_whitespace(&chars, i + 1);
+            
+            if let Some('-') = sig {
+                tokens.push(Token {
+                    tipo: "OP".into(),
+                    lexema: "--".into(),
+                    linea,
+                    columna,
+                });
+                
+                i = pos_sig + 1;
+                linea += saltos;
+                if saltos > 0 {
+                    columna = 1 + espacios;
+                } else {
+                    columna += 2 + espacios;
+                }
+                continue;
+            } else {
+                tokens.push(Token {
+                    tipo: "ARIT".into(),
+                    lexema: "-".into(),
+                    linea,
+                    columna,
+                });
+                i += 1;
+                columna += 1;
+                continue;
+            }
+        }
+
+       // ---------------- COMENTARIO LINEA // ----------------
         if i + 1 < chars.len() && chars[i] == '/' && chars[i+1] == '/' {
-
-            let col = columna;
-
             i += 2;
             columna += 2;
-
+            
             while i < chars.len() && chars[i] != '\n' {
                 i += 1;
                 columna += 1;
             }
-
-            tokens.push(Token {
-                tipo: "COMMENT".into(),
-                lexema: "//".into(),
-                linea,
-                columna: col,
-            });
-
+            
             continue;
         }
 
         // ---------------- COMENTARIO BLOQUE /* */ ----------------
-
         if i + 1 < chars.len() && chars[i] == '/' && chars[i+1] == '*' {
-
-            let col = columna;
-
             i += 2;
             columna += 2;
-
-            while i + 1 < chars.len() &&
+            
+            while i + 1 < chars.len() && 
                 !(chars[i] == '*' && chars[i+1] == '/') {
-
                 if chars[i] == '\n' {
                     linea += 1;
                     columna = 1;
                 } else {
                     columna += 1;
                 }
-
                 i += 1;
             }
-
+            
             i += 2;
             columna += 2;
-
-            tokens.push(Token {
-                tipo: "COMMENT".into(),
-                lexema: "/* */".into(),
-                linea,
-                columna: col,
-            });
-
+            
             continue;
         }
 
@@ -162,14 +229,16 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             continue;
         }
 
-        // ---------------- NUMERO ----------------
+                // ---------------- NUMERO ----------------
 
         if c.is_ascii_digit() {
 
             let start = i;
             let col = columna;
+            let start_linea = linea;
 
             let mut punto = false;
+            let mut error_punto = false;
 
             while i < chars.len() {
 
@@ -179,12 +248,14 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                 }
 
                 else if chars[i] == '.' && !punto {
-
+                    // Verificar si después del punto hay dígitos
                     if i+1 < chars.len() && chars[i+1].is_ascii_digit() {
                         punto = true;
                         i += 1;
                         columna += 1;
                     } else {
+                        // Punto sin dígitos después -> error
+                        error_punto = true;
                         break;
                     }
                 }
@@ -193,18 +264,29 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
                 }
             }
 
+            if error_punto {
+                let lexema_error: String = chars[start..=i].iter().collect();
+                errores.push(ErrorLexico {
+                    mensaje: format!("Número mal formado: '{}'", lexema_error),
+                    linea: start_linea,
+                    columna: col,
+                });
+                i += 1;
+                columna += 1;
+                continue;
+            }
+
             let lexema: String = chars[start..i].iter().collect();
 
             tokens.push(Token {
                 tipo: if punto { "FLOAT" } else { "INT" }.into(),
                 lexema,
-                linea,
+                linea: start_linea,
                 columna: col,
             });
 
             continue;
         }
-
         // ---------------- IDENT / RESERVADAS ----------------
 
         if c.is_ascii_alphabetic() || c == '_' {
@@ -249,7 +331,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
             continue;
         }
 
-        // ---------------- DOBLES ----------------
+        // ---------------- DOBLES (sin lookahead para otros operadores) ----------------
 
         if i + 1 < chars.len() {
 
@@ -257,8 +339,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
             if [
                 "==","!=","<=",">=",
-                "&&","||",
-                "++","--"
+                "&&","||"
             ].contains(&dos.as_str()) {
 
                 tokens.push(Token {
@@ -276,7 +357,7 @@ pub fn analizar(text: &str) -> (Vec<Token>, Vec<ErrorLexico>) {
 
         // ---------------- ARITMETICOS ----------------
 
-        if "+-*/%^".contains(c) {
+        if "*/%^".contains(c) {
 
             tokens.push(Token {
                 tipo: "ARIT".into(),

@@ -48,7 +48,6 @@
     </context>
 
 
-    <!-- PALABRAS RESERVADAS (Color4) -->
     <context id="keywords" style-ref="keyword">
       <keyword>if</keyword>
       <keyword>else</keyword>
@@ -67,19 +66,16 @@
     </context>
 
 
-    <!-- NUMEROS (Color1) -->
     <context id="numbers" style-ref="number">
       <match>\b[0-9]+(\.[0-9]+)?\b</match>
     </context>
 
 
-    <!-- IDENTIFICADORES (Color2) -->
     <context id="identifier" style-ref="identifier">
       <match>\b[a-zA-Z_][a-zA-Z0-9_]*\b</match>
     </context>
 
 
-    <!-- COMENTARIOS (Color3) -->
     <context id="comment-line" style-ref="comment">
       <start>//</start>
       <end>$</end>
@@ -91,26 +87,22 @@
     </context>
 
 
-    <!-- STRINGS -->
     <context id="strings" style-ref="string">
       <start>"</start>
       <end>"</end>
     </context>
 
 
-    <!-- OPERADORES ARITMETICOS (Color5) -->
     <context id="operators-arith" style-ref="arith">
       <match>\+\+|--|\+|-|\*|/|%|\^|=</match>
     </context>
 
 
-    <!-- OPERADORES LOGICOS / RELACIONALES (Color6) -->
     <context id="operators-logic" style-ref="logic">
       <match>&amp;&amp;|\|\||==|!=|&lt;=|&gt;=|&lt;|&gt;|!</match>
     </context>
 
 
-    <!-- SIMBOLOS -->
     <context id="symbols" style-ref="symbol">
       <match>[(){};,]</match>
     </context>
