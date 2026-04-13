@@ -13,7 +13,7 @@ pub struct PanelNotebooks {
 pub fn create_panels() -> PanelNotebooks {
     let lexic_view = Rc::new(RefCell::new(TextView::new()));
     let errors_view = Rc::new(RefCell::new(TextView::new()));
-    
+
     let debug_notebook = create_debug_notebook(&lexic_view);
     let errors_notebook = create_errors_notebook(&errors_view);
 

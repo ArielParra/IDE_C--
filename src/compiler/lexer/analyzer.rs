@@ -1,6 +1,6 @@
-use crate::models::{LexicalError, Token};
-use super::handlers::LexerHandlers;
 use super::errors::invalid_character;
+use super::handlers::LexerHandlers;
+use crate::models::{LexicalError, Token};
 
 pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
     let mut tokens = Vec::new();
@@ -17,12 +17,16 @@ pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
             continue;
         }
 
-        if let Some(token) = LexerHandlers::handle_plus(c, &chars, line, column, &mut i, &mut line, &mut column) {
+        if let Some(token) =
+            LexerHandlers::handle_plus(c, &chars, line, column, &mut i, &mut line, &mut column)
+        {
             tokens.push(token);
             continue;
         }
 
-        if let Some(token) = LexerHandlers::handle_minus(c, &chars, line, column, &mut i, &mut line, &mut column) {
+        if let Some(token) =
+            LexerHandlers::handle_minus(c, &chars, line, column, &mut i, &mut line, &mut column)
+        {
             tokens.push(token);
             continue;
         }
@@ -31,42 +35,63 @@ pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
             continue;
         }
 
-        if let Some(error) = LexerHandlers::handle_block_comment_start(c, &chars, line, column, &mut i, &mut line, &mut column) {
+        if let Some(error) = LexerHandlers::handle_block_comment_start(
+            c,
+            &chars,
+            line,
+            column,
+            &mut i,
+            &mut line,
+            &mut column,
+        ) {
             errors.push(error);
             continue;
         }
 
-        if let Some((token, error)) = LexerHandlers::handle_string(c, &chars, line, column, &mut i, &mut line, &mut column) {
+        if let Some((token, error)) =
+            LexerHandlers::handle_string(c, &chars, line, column, &mut i, &mut line, &mut column)
+        {
             push_token_or_error(&mut tokens, &mut errors, token, error);
             continue;
         }
 
-        if let Some((token, error)) = LexerHandlers::handle_char(c, &chars, line, column, &mut i, &mut line, &mut column) {
+        if let Some((token, error)) =
+            LexerHandlers::handle_char(c, &chars, line, column, &mut i, &mut line, &mut column)
+        {
             push_token_or_error(&mut tokens, &mut errors, token, error);
             continue;
         }
 
-        if let Some((token, error)) = LexerHandlers::handle_number(c, &chars, line, column, &mut i, &mut column) {
+        if let Some((token, error)) =
+            LexerHandlers::handle_number(c, &chars, line, column, &mut i, &mut column)
+        {
             push_token_or_error(&mut tokens, &mut errors, token, error);
             continue;
         }
 
-        if let Some(token) = LexerHandlers::handle_identifier(c, &chars, line, column, &mut i, &mut column) {
+        if let Some(token) =
+            LexerHandlers::handle_identifier(c, &chars, line, column, &mut i, &mut column)
+        {
             tokens.push(token);
             continue;
         }
 
-        if let Some(token) = LexerHandlers::handle_double_operator(&chars, line, column, &mut i, &mut column) {
+        if let Some(token) =
+            LexerHandlers::handle_double_operator(&chars, line, column, &mut i, &mut column)
+        {
             tokens.push(token);
             continue;
         }
 
-        if let Some(token) = LexerHandlers::handle_arithmetic(c, line, column, &mut i, &mut column) {
+        if let Some(token) = LexerHandlers::handle_arithmetic(c, line, column, &mut i, &mut column)
+        {
             tokens.push(token);
             continue;
         }
 
-        if let Some(token) = LexerHandlers::handle_relational(c, &chars, line, column, &mut i, &mut column) {
+        if let Some(token) =
+            LexerHandlers::handle_relational(c, &chars, line, column, &mut i, &mut column)
+        {
             tokens.push(token);
             continue;
         }
@@ -84,7 +109,12 @@ pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
     (tokens, errors)
 }
 
-fn push_token_or_error(tokens: &mut Vec<Token>, errors: &mut Vec<LexicalError>, token: Option<Token>, error: Option<LexicalError>) {
+fn push_token_or_error(
+    tokens: &mut Vec<Token>,
+    errors: &mut Vec<LexicalError>,
+    token: Option<Token>,
+    error: Option<LexicalError>,
+) {
     if let Some(t) = token {
         tokens.push(t);
     }

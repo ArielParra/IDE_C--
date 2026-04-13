@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::rc::Rc;
 
-use crate::file_manager;
 use crate::compiler;
+use crate::file_manager;
 
 pub struct ActionHandlers;
 
@@ -24,12 +24,7 @@ impl ActionHandlers {
         let buffer_clone = text_buffer.clone();
 
         Self::register_file_actions(app, &window, &buffer_clone, file_state.clone());
-        Self::register_lexical_action(
-            app,
-            &buffer_clone,
-            lex_view,
-            errors_view,
-        );
+        Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view);
         Self::register_compile_action(app, file_state);
     }
 
@@ -113,13 +108,20 @@ impl ActionHandlers {
         let err_view_clone = errors_view.clone();
 
         lexical_action.connect_activate(move |_, _| {
-            let text = buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
+            let text =
+                buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
             let (tokens, errors) = compiler::analyze(&text);
 
             let lex_buffer = lex_view_clone.borrow().buffer();
             lex_buffer.set_text("");
-            
-            let link_tag = lex_buffer.create_tag(Some("link"), &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)]);
+
+            let link_tag = lex_buffer.create_tag(
+                Some("link"),
+                &[
+                    ("foreground", &"#1a73e8"),
+                    ("underline", &Underline::Single),
+                ],
+            );
 
             for t in &tokens {
                 let color = lexical_token_color(&t.token_type, &t.lexeme);
@@ -127,11 +129,15 @@ impl ActionHandlers {
 
                 let mut iter = lex_buffer.end_iter();
                 if let Some(ref tag) = color_tag {
-                    lex_buffer.insert_with_tags(&mut iter, &format!("{}: '{}' ", t.token_type, t.lexeme), &[tag]);
+                    lex_buffer.insert_with_tags(
+                        &mut iter,
+                        &format!("{}: '{}' ", t.token_type, t.lexeme),
+                        &[tag],
+                    );
                 } else {
                     lex_buffer.insert(&mut iter, &format!("{}: '{}' ", t.token_type, t.lexeme));
                 }
-                
+
                 let mut link_iter = lex_buffer.end_iter();
                 let link_text = format!("({}:{})\n", t.line, t.column);
                 if let Some(ref tag) = link_tag {
@@ -144,7 +150,13 @@ impl ActionHandlers {
             let err_buffer = err_view_clone.borrow().buffer();
             err_buffer.set_text("");
 
-            let error_link_tag = err_buffer.create_tag(None, &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)]);
+            let error_link_tag = err_buffer.create_tag(
+                None,
+                &[
+                    ("foreground", &"#1a73e8"),
+                    ("underline", &Underline::Single),
+                ],
+            );
 
             for e in &errors {
                 let mut message_iter = err_buffer.end_iter();
@@ -166,10 +178,7 @@ impl ActionHandlers {
         app.add_action(&lexical_action);
     }
 
-    fn register_compile_action(
-        app: &Application,
-        file_state: Rc<RefCell<Option<PathBuf>>>,
-    ) {
+    fn register_compile_action(app: &Application, file_state: Rc<RefCell<Option<PathBuf>>>) {
         let compile_action = gio::SimpleAction::new("c--compiler", None);
         let file_state_clone = file_state.clone();
 
@@ -232,10 +241,9 @@ impl ActionHandlers {
 
 fn lexical_token_color(tipo: &str, lexema: &str) -> &'static str {
     match tipo {
-        "MAIN" | "IF" | "ELSE" | "END" | "DO" | "WHILE" | "FOR" | "SWITCH"
-        | "CASE" | "RETURN" | "VOID" | "INT_T" | "FLOAT_T" | "CHAR_T" | "BOOL_T"
-        | "TRUE" | "FALSE" | "CIN" | "COUT" | "INCLUDE" | "DEFINE" | "STRUCT"
-        | "BREAK" | "CONTINUE" => "#569cd6",
+        "MAIN" | "IF" | "ELSE" | "END" | "DO" | "WHILE" | "FOR" | "SWITCH" | "CASE" | "RETURN"
+        | "VOID" | "INT_T" | "FLOAT_T" | "CHAR_T" | "BOOL_T" | "TRUE" | "FALSE" | "CIN"
+        | "COUT" | "INCLUDE" | "DEFINE" | "STRUCT" | "BREAK" | "CONTINUE" => "#569cd6",
         "INT" | "FLOAT" => "#b5cea8",
         "STRING" | "CHAR" => "#ce9178",
         "ID" => "#ff57f4",

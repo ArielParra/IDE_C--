@@ -13,7 +13,13 @@ impl LanguageStyle {
         }
     }
 
-    pub fn configure(&self) -> (Option<sourceview5::Language>, Option<sourceview5::StyleScheme>) {
+    pub fn configure(
+        &self,
+        is_dark: bool,
+    ) -> (
+        Option<sourceview5::Language>,
+        Option<sourceview5::StyleScheme>,
+    ) {
         let base = std::env::current_dir().unwrap();
 
         let lang_path = base.join("src/resources/language-specs");
@@ -31,9 +37,36 @@ impl LanguageStyle {
         let style_paths: Vec<&str> = style_paths.iter().map(|s| s.as_str()).collect();
         self.style_manager.set_search_path(&style_paths);
 
-        let scheme = self.style_manager.scheme("dark");
+        let scheme_name = if is_dark { "dark" } else { "light" };
+        let scheme = self.style_manager.scheme(scheme_name);
 
         (language, scheme)
+    }
+
+    pub fn is_dark_mode() -> bool {
+        #[cfg(windows)]
+        {
+            use winreg::enums::*;
+            use winreg::RegKey;
+
+            let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+            if let Ok(personalize) = hkcu
+                .open_subkey("Software\\Microsoft\\Windows\\CurrentVersion\\Themes\\Personalize")
+            {
+                if let Ok(apps_use_light_theme) =
+                    personalize.get_value::<u32, _>("AppsUseLightTheme")
+                {
+                    return apps_use_light_theme == 0;
+                }
+            }
+        }
+
+        if let Some(display) = gtk::gdk::Display::default() {
+            let settings = gtk::Settings::for_display(&display);
+            return settings.is_gtk_application_prefer_dark_theme();
+        }
+
+        false
     }
 }
 

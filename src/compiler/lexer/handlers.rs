@@ -1,6 +1,6 @@
-use crate::models::{LexicalError, Token};
 use super::errors::skip_whitespace;
 use super::tokenizer::Tokenizer;
+use crate::models::{LexicalError, Token};
 
 pub struct LexerHandlers;
 
@@ -20,7 +20,15 @@ impl LexerHandlers {
         false
     }
 
-    pub fn handle_plus(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, line_out: &mut usize, column_out: &mut usize) -> Option<Token> {
+    pub fn handle_plus(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        line_out: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
         if c != '+' {
             return None;
         }
@@ -28,7 +36,11 @@ impl LexerHandlers {
         if let Some('+') = next {
             *i = pos_next + 1;
             *line_out += breaks;
-            *column_out = if breaks > 0 { 1 + spaces } else { column + 2 + spaces };
+            *column_out = if breaks > 0 {
+                1 + spaces
+            } else {
+                column + 2 + spaces
+            };
             Some(Tokenizer::new_token("OP", "++", line, column))
         } else {
             *i += 1;
@@ -37,7 +49,15 @@ impl LexerHandlers {
         }
     }
 
-    pub fn handle_minus(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, line_out: &mut usize, column_out: &mut usize) -> Option<Token> {
+    pub fn handle_minus(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        line_out: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
         if c != '-' {
             return None;
         }
@@ -45,7 +65,11 @@ impl LexerHandlers {
         if let Some('-') = next {
             *i = pos_next + 1;
             *line_out += breaks;
-            *column_out = if breaks > 0 { 1 + spaces } else { column + 2 + spaces };
+            *column_out = if breaks > 0 {
+                1 + spaces
+            } else {
+                column + 2 + spaces
+            };
             Some(Tokenizer::new_token("OP", "--", line, column))
         } else {
             *i += 1;
@@ -67,7 +91,15 @@ impl LexerHandlers {
         true
     }
 
-    pub fn handle_block_comment_start(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, line_out: &mut usize, column_out: &mut usize) -> Option<LexicalError> {
+    pub fn handle_block_comment_start(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        line_out: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<LexicalError> {
         if c != '/' || *i + 1 >= chars.len() || chars[*i + 1] != '*' {
             return None;
         }
@@ -93,7 +125,15 @@ impl LexerHandlers {
         None
     }
 
-    pub fn handle_string(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, line_out: &mut usize, column_out: &mut usize) -> Option<(Option<Token>, Option<LexicalError>)> {
+    pub fn handle_string(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        line_out: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<(Option<Token>, Option<LexicalError>)> {
         if c != '"' {
             return None;
         }
@@ -114,15 +154,33 @@ impl LexerHandlers {
         if *i >= chars.len() {
             *i += 1;
             let content: String = chars[start..].iter().collect();
-            return Some((None, Some(LexicalError::unclosed_string(&content, start_line, start_col))));
+            return Some((
+                None,
+                Some(LexicalError::unclosed_string(
+                    &content, start_line, start_col,
+                )),
+            ));
         }
         *i += 1;
         *column_out += 1;
         let lexeme: String = chars[start..*i].iter().collect();
-        Some((Some(Tokenizer::new_token("STRING", &lexeme, start_line, start_col)), None))
+        Some((
+            Some(Tokenizer::new_token(
+                "STRING", &lexeme, start_line, start_col,
+            )),
+            None,
+        ))
     }
 
-    pub fn handle_char(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, line_out: &mut usize, column_out: &mut usize) -> Option<(Option<Token>, Option<LexicalError>)> {
+    pub fn handle_char(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        line_out: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<(Option<Token>, Option<LexicalError>)> {
         if c != '\'' {
             return None;
         }
@@ -143,15 +201,28 @@ impl LexerHandlers {
         if *i >= chars.len() {
             *i += 1;
             let content: String = chars[start..].iter().collect();
-            return Some((None, Some(LexicalError::unclosed_char(&content, start_line, start_col))));
+            return Some((
+                None,
+                Some(LexicalError::unclosed_char(&content, start_line, start_col)),
+            ));
         }
         *i += 1;
         *column_out += 1;
         let lexeme: String = chars[start..*i].iter().collect();
-        Some((Some(Tokenizer::new_token("CHAR", &lexeme, start_line, start_col)), None))
+        Some((
+            Some(Tokenizer::new_token("CHAR", &lexeme, start_line, start_col)),
+            None,
+        ))
     }
 
-    pub fn handle_number(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, column_out: &mut usize) -> Option<(Option<Token>, Option<LexicalError>)> {
+    pub fn handle_number(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<(Option<Token>, Option<LexicalError>)> {
         if !c.is_ascii_digit() {
             return None;
         }
@@ -181,14 +252,33 @@ impl LexerHandlers {
             let lexeme_error: String = chars[start..=*i].iter().collect();
             *i += 1;
             *column_out += 1;
-            return Some((None, Some(LexicalError::malformed_number(&lexeme_error, start_line, dot_error_col))));
+            return Some((
+                None,
+                Some(LexicalError::malformed_number(
+                    &lexeme_error,
+                    start_line,
+                    dot_error_col,
+                )),
+            ));
         }
         let lexeme: String = chars[start..*i].iter().collect();
         let token_type = if has_dot { "FLOAT" } else { "INT" };
-        Some((Some(Tokenizer::new_token(token_type, &lexeme, start_line, start_col)), None))
+        Some((
+            Some(Tokenizer::new_token(
+                token_type, &lexeme, start_line, start_col,
+            )),
+            None,
+        ))
     }
 
-    pub fn handle_identifier(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, column_out: &mut usize) -> Option<Token> {
+    pub fn handle_identifier(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
         if !c.is_ascii_alphabetic() && c != '_' {
             return None;
         }
@@ -203,7 +293,13 @@ impl LexerHandlers {
         Some(Tokenizer::new_token(token_type, &lexeme, line, start_col))
     }
 
-    pub fn handle_double_operator(chars: &[char], line: usize, column: usize, i: &mut usize, column_out: &mut usize) -> Option<Token> {
+    pub fn handle_double_operator(
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
         if let Some(pair) = Tokenizer::is_double_operator(chars, *i) {
             *i += 2;
             *column_out += 2;
@@ -213,7 +309,13 @@ impl LexerHandlers {
         }
     }
 
-    pub fn handle_arithmetic(c: char, line: usize, column: usize, i: &mut usize, column_out: &mut usize) -> Option<Token> {
+    pub fn handle_arithmetic(
+        c: char,
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
         if !Tokenizer::is_arithmetic(c) {
             return None;
         }
@@ -222,7 +324,14 @@ impl LexerHandlers {
         Some(Tokenizer::new_token("ARIT", &c.to_string(), line, column))
     }
 
-    pub fn handle_relational(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, column_out: &mut usize) -> Option<Token> {
+    pub fn handle_relational(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
         if !Tokenizer::is_relational(c) {
             return None;
         }
@@ -235,10 +344,21 @@ impl LexerHandlers {
         let token_type = if c == '=' { "ASIG" } else { "REL" };
         *i += 1;
         *column_out += 1;
-        Some(Tokenizer::new_token(token_type, &c.to_string(), line, column))
+        Some(Tokenizer::new_token(
+            token_type,
+            &c.to_string(),
+            line,
+            column,
+        ))
     }
 
-    pub fn handle_symbol(c: char, line: usize, column: usize, i: &mut usize, column_out: &mut usize) -> Option<Token> {
+    pub fn handle_symbol(
+        c: char,
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
         if !Tokenizer::is_symbol(c) {
             return None;
         }

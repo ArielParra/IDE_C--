@@ -6,11 +6,7 @@ pub struct Layout {
 }
 
 impl Layout {
-    pub fn new(
-        editor: &ScrolledWindow,
-        debug_panel: &Notebook,
-        errors_panel: &Notebook,
-    ) -> Self {
+    pub fn new(editor: &ScrolledWindow, debug_panel: &Notebook, errors_panel: &Notebook) -> Self {
         let panedtop = Paned::new(Orientation::Horizontal);
         panedtop.set_position(500);
 
@@ -30,6 +26,8 @@ impl Layout {
         main_paned.set_start_child(Some(&panedtop));
         main_paned.set_end_child(Some(&error_box));
 
-        Layout { container: main_paned }
+        Layout {
+            container: main_paned,
+        }
     }
 }

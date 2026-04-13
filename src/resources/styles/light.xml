@@ -1,50 +1,50 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<style-scheme id="dark"
-              name="Dark"
+<style-scheme id="light"
+              name="Light"
               version="1.0">
 
   <!-- fondo general -->
   <style name="text"
-         foreground="#ffffff"
-         background="#1e1e1e"/>
+         foreground="#000000"
+         background="#ffffff"/>
 
   <!-- numeros de linea -->
   <style name="line-numbers"
-         foreground="#858585"
-         background="#1e1e1e"/>
+         foreground="#555555"
+         background="#f0f0f0"/>
 
   <!-- palabras reservadas -->
   <style name="def:keyword"
-         foreground="#569cd6"
+         foreground="#0000ff"
          bold="true"/>
 
   <!-- identificadores -->
   <style name="def:identifier"
-         foreground="#ff57f4ff"/>
+         foreground="#000000"/>
 
   <!-- numeros -->
   <style name="def:number"
-         foreground="#b5cea8"/>
+         foreground="#098658"/>
 
   <!-- comentarios -->
   <style name="def:comment"
-         foreground="#6a9955"
+         foreground="#008000"
          italic="true"/>
 
   <!-- operadores -->
   <style name="def:operator"
-         foreground="#f44747"/>
+         foreground="#000000"/>
 
   <!-- statements / logicos -->
   <style name="def:statement"
-         foreground="#569cd6"/>
+         foreground="#0000ff"/>
 
   <!-- simbolos -->
   <style name="def:special-char"
-         foreground="#d7ba7d"/>
+         foreground="#a31515"/>
 
   <!-- strings -->
   <style name="def:string"
-         foreground="#ce9178"/>
+         foreground="#a31515"/>
 
 </style-scheme>

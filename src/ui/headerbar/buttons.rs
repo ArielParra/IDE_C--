@@ -20,9 +20,7 @@ impl IDEHeaderBar {
         ];
 
         for (icon, action) in buttons {
-            let btn = Button::builder()
-                .icon_name(icon)
-                .build();
+            let btn = Button::builder().icon_name(icon).build();
 
             let app_clone = app.clone();
             btn.connect_clicked(move |_| {

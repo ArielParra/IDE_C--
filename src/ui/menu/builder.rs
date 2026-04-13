@@ -64,9 +64,11 @@ impl MenuBuilder {
         compiler.append(Some("Intermediate Code"), Some("app.intermedio"));
         compiler.append(Some("Execute"), Some("app.ejecutar"));
 
-        self.model.append_submenu(Some("Lexical Analysis"), &lexical);
+        self.model
+            .append_submenu(Some("Lexical Analysis"), &lexical);
         self.model.append_submenu(Some("Syntax Analysis"), &syntax);
-        self.model.append_submenu(Some("Semantic Analysis"), &semantic);
+        self.model
+            .append_submenu(Some("Semantic Analysis"), &semantic);
         self.model.append_submenu(Some("Compile"), &compiler);
         self
     }

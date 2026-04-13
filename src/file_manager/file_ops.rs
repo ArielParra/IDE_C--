@@ -11,34 +11,33 @@ pub fn new_file(buffer: &gtk::TextBuffer, current_file: FileState) {
     *current_file.borrow_mut() = None;
 }
 
-pub fn open_file_dialog(window: &ApplicationWindow, buffer: gtk::TextBuffer, current_file: FileState) {
-    let dialog = FileDialog::builder()
-        .title("Open File")
-        .modal(true)
-        .build();
+pub fn open_file_dialog(
+    window: &ApplicationWindow,
+    buffer: gtk::TextBuffer,
+    current_file: FileState,
+) {
+    let dialog = FileDialog::builder().title("Open File").modal(true).build();
 
     dialog.open(
         Some(window),
         None::<&gtk::gio::Cancellable>,
-        move |result| {
-            match result {
-                Ok(file) => {
-                    if let Some(path) = file.path() {
-                        match fs::read(&path) {
-                            Ok(bytes) => {
-                                let contents = String::from_utf8_lossy(&bytes);
-                                buffer.set_text(&contents);
-                                *current_file.borrow_mut() = Some(path);
-                            }
-                            Err(e) => {
-                                eprintln!("Failed to read file: {}", e);
-                            }
+        move |result| match result {
+            Ok(file) => {
+                if let Some(path) = file.path() {
+                    match fs::read(&path) {
+                        Ok(bytes) => {
+                            let contents = String::from_utf8_lossy(&bytes);
+                            buffer.set_text(&contents);
+                            *current_file.borrow_mut() = Some(path);
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to read file: {}", e);
                         }
                     }
                 }
-                Err(e) => {
-                    eprintln!("Open file dialog error: {}", e);
-                }
+            }
+            Err(e) => {
+                eprintln!("Open file dialog error: {}", e);
             }
         },
     );
@@ -54,29 +53,28 @@ pub fn save_file(window: &ApplicationWindow, buffer: gtk::TextBuffer, current_fi
     }
 }
 
-pub fn save_as_file_dialog(window: &ApplicationWindow, buffer: gtk::TextBuffer, current_file: FileState) {
-    let dialog = FileDialog::builder()
-        .title("Save File")
-        .modal(true)
-        .build();
+pub fn save_as_file_dialog(
+    window: &ApplicationWindow,
+    buffer: gtk::TextBuffer,
+    current_file: FileState,
+) {
+    let dialog = FileDialog::builder().title("Save File").modal(true).build();
 
     dialog.save(
         Some(window),
         None::<&gtk::gio::Cancellable>,
-        move |result| {
-            match result {
-                Ok(file) => {
-                    if let Some(path) = file.path() {
-                        if let Err(e) = write_to_file(&path, &buffer) {
-                            eprintln!("Failed to save file: {}", e);
-                        } else {
-                            *current_file.borrow_mut() = Some(path);
-                        }
+        move |result| match result {
+            Ok(file) => {
+                if let Some(path) = file.path() {
+                    if let Err(e) = write_to_file(&path, &buffer) {
+                        eprintln!("Failed to save file: {}", e);
+                    } else {
+                        *current_file.borrow_mut() = Some(path);
                     }
                 }
-                Err(e) => {
-                    eprintln!("Save dialog error: {}", e);
-                }
+            }
+            Err(e) => {
+                eprintln!("Save dialog error: {}", e);
             }
         },
     );

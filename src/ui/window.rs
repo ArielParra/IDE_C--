@@ -22,7 +22,8 @@ impl Window {
             .build();
 
         let language_style = LanguageStyle::new();
-        let (language, scheme) = language_style.configure();
+        let is_dark = LanguageStyle::is_dark_mode();
+        let (language, scheme) = language_style.configure(is_dark);
 
         let settings = EditorSettings::default()
             .with_language(language)
