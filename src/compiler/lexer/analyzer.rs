@@ -35,7 +35,7 @@ pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
             continue;
         }
 
-        if let Some(error) = LexerHandlers::handle_block_comment_start(
+        if let Some(result) = LexerHandlers::handle_block_comment_start(
             c,
             &chars,
             line,
@@ -44,7 +44,9 @@ pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
             &mut line,
             &mut column,
         ) {
-            errors.push(error);
+            if let Err(error) = result {
+                errors.push(error);
+            }
             continue;
         }
 

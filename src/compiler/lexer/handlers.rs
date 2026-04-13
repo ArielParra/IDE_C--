@@ -146,7 +146,7 @@ impl LexerHandlers {
         i: &mut usize,
         line_out: &mut usize,
         column_out: &mut usize,
-    ) -> Option<LexicalError> {
+    ) -> Option<Result<(), LexicalError>> {
         if c != '/' || *i + 1 >= chars.len() || chars[*i + 1] != '*' {
             return None;
         }
@@ -165,11 +165,11 @@ impl LexerHandlers {
         }
         if *i + 1 >= chars.len() {
             *i += 1;
-            return Some(LexicalError::unclosed_block_comment(start_line, start_col));
+            return Some(Err(LexicalError::unclosed_block_comment(start_line, start_col)));
         }
         *i += 2;
         *column_out += 2;
-        None
+        Some(Ok(()))
     }
 
     pub fn handle_string(

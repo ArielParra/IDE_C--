@@ -44,10 +44,12 @@ do
 
 
 5);
+/*
  while(y==0){
     cin mas;
     cout x;
 };
+*/
 }
 
 
