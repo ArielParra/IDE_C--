@@ -5,7 +5,7 @@ pub struct LexerHandlers;
 
 impl LexerHandlers {
     pub fn handle_whitespace(c: char, line: &mut usize, column: &mut usize, i: &mut usize) -> bool {
-        if c == ' ' || c == '\t' {
+        if c == ' ' || c == '\t' || c == '\r' {
             *column += 1;
             *i += 1;
             return true;
@@ -40,7 +40,7 @@ impl LexerHandlers {
 
         while temp_i < chars.len() {
             match chars[temp_i] {
-                ' ' | '\t' => {
+                ' ' | '\t' | '\r' => {
                     temp_i += 1;
                     temp_col += 1;
                 }
@@ -94,7 +94,7 @@ impl LexerHandlers {
 
         while temp_i < chars.len() {
             match chars[temp_i] {
-                ' ' | '\t' => {
+                ' ' | '\t' | '\r' => {
                     temp_i += 1;
                     temp_col += 1;
                 }
@@ -392,7 +392,7 @@ impl LexerHandlers {
 
         while temp_i < chars.len() {
             match chars[temp_i] {
-                ' ' | '\t' => {
+                ' ' | '\t' | '\r' => {
                     temp_i += 1;
                     temp_col += 1;
                 }

@@ -42,7 +42,7 @@ impl Tokenizer {
             return None;
         }
         let pair: String = chars[i..i + 2].iter().collect();
-        if ["==", "!=", "<=", ">=", "&&", "||"].contains(&pair.as_str()) {
+        if ["&&", "||"].contains(&pair.as_str()) {
             Some(pair)
         } else {
             None
