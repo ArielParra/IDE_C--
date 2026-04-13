@@ -21,18 +21,24 @@ pub fn open_file_dialog(window: &ApplicationWindow, buffer: gtk::TextBuffer, cur
         Some(window),
         None::<&gtk::gio::Cancellable>,
         move |result| {
-            let res: Result<(), Box<dyn std::error::Error>> = (|| {
-                let file = result?;
-                let path = file.path().ok_or("Invalid path")?;
-                let bytes = fs::read(&path)?;
-                let contents = String::from_utf8_lossy(&bytes);
-                buffer.set_text(&contents);
-                *current_file.borrow_mut() = Some(path);
-                Ok(())
-            })();
-            
-            if let Err(e) = res {
-                eprintln!("Open file error: {}", e);
+            match result {
+                Ok(file) => {
+                    if let Some(path) = file.path() {
+                        match fs::read(&path) {
+                            Ok(bytes) => {
+                                let contents = String::from_utf8_lossy(&bytes);
+                                buffer.set_text(&contents);
+                                *current_file.borrow_mut() = Some(path);
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to read file: {}", e);
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Open file dialog error: {}", e);
+                }
             }
         },
     );
@@ -40,7 +46,9 @@ pub fn open_file_dialog(window: &ApplicationWindow, buffer: gtk::TextBuffer, cur
 
 pub fn save_file(window: &ApplicationWindow, buffer: gtk::TextBuffer, current_file: FileState) {
     if let Some(path) = current_file.borrow().clone() {
-        write_to_file(&path, &buffer);
+        if let Err(e) = write_to_file(&path, &buffer) {
+            eprintln!("Failed to save file: {}", e);
+        }
     } else {
         save_as_file_dialog(window, buffer, current_file);
     }
@@ -56,22 +64,30 @@ pub fn save_as_file_dialog(window: &ApplicationWindow, buffer: gtk::TextBuffer, 
         Some(window),
         None::<&gtk::gio::Cancellable>,
         move |result| {
-            if let Ok(file) = result {
-                if let Some(path) = file.path() {
-                    write_to_file(&path, &buffer);
-                    *current_file.borrow_mut() = Some(path);
+            match result {
+                Ok(file) => {
+                    if let Some(path) = file.path() {
+                        if let Err(e) = write_to_file(&path, &buffer) {
+                            eprintln!("Failed to save file: {}", e);
+                        } else {
+                            *current_file.borrow_mut() = Some(path);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Save dialog error: {}", e);
                 }
             }
         },
     );
 }
 
-fn write_to_file(path: &PathBuf, buffer: &gtk::TextBuffer) {
+fn write_to_file(path: &PathBuf, buffer: &gtk::TextBuffer) -> std::io::Result<()> {
     let start = buffer.start_iter();
     let end = buffer.end_iter();
     let text = buffer.text(&start, &end, true);
 
-    if let Ok(mut f) = fs::File::create(path) {
-        let _ = f.write_all(text.as_bytes());
-    }
+    let mut file = fs::File::create(path)?;
+    file.write_all(text.as_bytes())?;
+    Ok(())
 }

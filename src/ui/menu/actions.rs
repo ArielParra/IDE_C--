@@ -1,6 +1,5 @@
 use gtk::prelude::*;
 use gtk::{gio, pango::Underline, Application, ApplicationWindow, TextView};
-use sourceview5::View as SourceView;
 use std::cell::RefCell;
 use std::io::BufRead;
 use std::path::PathBuf;
@@ -9,7 +8,6 @@ use std::rc::Rc;
 
 use crate::file_manager;
 use crate::compiler;
-use super::navigator::{ErrorNavigator, LexicNavigator};
 
 pub struct ActionHandlers;
 
@@ -18,7 +16,6 @@ impl ActionHandlers {
         app: &Application,
         window: &ApplicationWindow,
         buffer: &impl IsA<gtk::TextBuffer>,
-        editor_view: SourceView,
         file_state: Rc<RefCell<Option<PathBuf>>>,
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
@@ -32,7 +29,6 @@ impl ActionHandlers {
             &buffer_clone,
             lex_view,
             errors_view,
-            editor_view,
         );
         Self::register_compile_action(app, file_state);
     }
@@ -110,13 +106,11 @@ impl ActionHandlers {
         buffer: &gtk::TextBuffer,
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
-        editor_view: SourceView,
     ) {
         let lexical_action = gio::SimpleAction::new("lexical", None);
         let buffer_clone = buffer.clone();
         let lex_view_clone = lex_view.clone();
         let err_view_clone = errors_view.clone();
-        let editor_view_clone = editor_view.clone();
 
         lexical_action.connect_activate(move |_, _| {
             let text = buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
@@ -125,30 +119,32 @@ impl ActionHandlers {
             let lex_buffer = lex_view_clone.borrow().buffer();
             lex_buffer.set_text("");
             
-            let link_tag = lex_buffer
-                .create_tag(Some("link"), &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)])
-                .expect("failed to create link tag");
+            let link_tag = lex_buffer.create_tag(Some("link"), &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)]);
 
             for t in &tokens {
                 let color = lexical_token_color(&t.token_type, &t.lexeme);
-                let color_tag = lex_buffer
-                    .create_tag(None, &[("foreground", &color)])
-                    .expect("failed to create color tag");
+                let color_tag = lex_buffer.create_tag(None, &[("foreground", &color)]);
 
                 let mut iter = lex_buffer.end_iter();
-                lex_buffer.insert_with_tags(&mut iter, &format!("{}: '{}' ", t.token_type, t.lexeme), &[&color_tag]);
+                if let Some(ref tag) = color_tag {
+                    lex_buffer.insert_with_tags(&mut iter, &format!("{}: '{}' ", t.token_type, t.lexeme), &[tag]);
+                } else {
+                    lex_buffer.insert(&mut iter, &format!("{}: '{}' ", t.token_type, t.lexeme));
+                }
                 
                 let mut link_iter = lex_buffer.end_iter();
                 let link_text = format!("({}:{})\n", t.line, t.column);
-                lex_buffer.insert_with_tags(&mut link_iter, &link_text, &[&link_tag]);
+                if let Some(ref tag) = link_tag {
+                    lex_buffer.insert_with_tags(&mut link_iter, &link_text, &[tag]);
+                } else {
+                    lex_buffer.insert(&mut link_iter, &link_text);
+                }
             }
 
             let err_buffer = err_view_clone.borrow().buffer();
             err_buffer.set_text("");
 
-            let error_link_tag = err_buffer
-                .create_tag(None, &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)])
-                .expect("failed to create error link tag");
+            let error_link_tag = err_buffer.create_tag(None, &[("foreground", &"#1a73e8"), ("underline", &Underline::Single)]);
 
             for e in &errors {
                 let mut message_iter = err_buffer.end_iter();
@@ -156,14 +152,15 @@ impl ActionHandlers {
 
                 let mut link_iter = err_buffer.end_iter();
                 let link_text = format!("({}:{})", e.line, e.column);
-                err_buffer.insert_with_tags(&mut link_iter, &link_text, &[&error_link_tag]);
+                if let Some(ref tag) = error_link_tag {
+                    err_buffer.insert_with_tags(&mut link_iter, &link_text, &[tag]);
+                } else {
+                    err_buffer.insert(&mut link_iter, &link_text);
+                }
 
                 let mut newline_iter = err_buffer.end_iter();
                 err_buffer.insert(&mut newline_iter, "\n");
             }
-
-            LexicNavigator::connect_position_click(&lex_view_clone, &buffer_clone, &editor_view_clone);
-            ErrorNavigator::connect_error_click(&err_view_clone, &buffer_clone, &editor_view_clone);
         });
 
         app.add_action(&lexical_action);

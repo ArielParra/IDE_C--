@@ -159,7 +159,7 @@ impl LexerHandlers {
         let start_col = column;
         let start_line = line;
         let mut has_dot = false;
-        let mut dot_error = false;
+        let mut dot_error_col = 0;
         while *i < chars.len() {
             if chars[*i].is_ascii_digit() {
                 *i += 1;
@@ -170,18 +170,18 @@ impl LexerHandlers {
                     *i += 1;
                     *column_out += 1;
                 } else {
-                    dot_error = true;
+                    dot_error_col = *column_out;
                     break;
                 }
             } else {
                 break;
             }
         }
-        if dot_error {
+        if dot_error_col > 0 {
             let lexeme_error: String = chars[start..=*i].iter().collect();
             *i += 1;
             *column_out += 1;
-            return Some((None, Some(LexicalError::malformed_number(&lexeme_error, start_line, start_col))));
+            return Some((None, Some(LexicalError::malformed_number(&lexeme_error, start_line, dot_error_col))));
         }
         let lexeme: String = chars[start..*i].iter().collect();
         let token_type = if has_dot { "FLOAT" } else { "INT" };
