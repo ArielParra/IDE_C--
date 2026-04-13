@@ -1,71 +1,65 @@
-// ================= BUILD UI =================
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box, Orientation };
-use std::cell::RefCell;
-use std::path::PathBuf;
-use std::rc::Rc;
+use gtk::{Application, ApplicationWindow, Box, Orientation};
 
-use super::editor::*;
-use super::layout::*;
-use super::headerbar::*;
-use super::language_style::*;
-use super::notebook::*;
-use super::menu::*;
+use super::editor::{create_editor, EditorSettings};
+use super::headerbar::IDEHeaderBar;
+use super::menu::build_menu;
+use super::panels::{create_panels, Layout};
+use crate::models::new_file_state;
+use crate::ui::language_style::LanguageStyle;
 
-// ================= BUILD UI =================
+pub struct Window {
+    pub widget: ApplicationWindow,
+}
 
-// Builds the entire IDE interface:
-// main window, editor, notebooks, layout, header bar and menu.
-// Assembles everything in a vertical Box and shows the window.
+impl Window {
+    pub fn build(app: &Application) -> Self {
+        let window = ApplicationWindow::builder()
+            .application(app)
+            .title("IDE_C--")
+            .default_width(900)
+            .default_height(600)
+            .build();
 
-pub fn build_ui(app: &Application) {
+        let language_style = LanguageStyle::new();
+        let (language, scheme) = language_style.configure();
 
-    let window = ApplicationWindow::builder()
-        .application(app)
-        .title("IDE_C--")
-        .default_width(900)
-        .default_height(600)
-        .build();
+        let settings = EditorSettings::default()
+            .with_language(language)
+            .with_style_scheme(scheme);
 
+        let editor = create_editor(
+            language_style.language_manager,
+            language_style.style_manager,
+            &settings,
+        );
 
-   let (lm, sm, lang, scheme) = create_language_and_style();
+        let panels = create_panels();
+        let layout = Layout::new(&editor.container, &panels.debug, &panels.errors);
+        let headerbar = IDEHeaderBar::new(app);
+        let file_state = new_file_state();
 
-    let (buffer, view, codigo) =
-    create_editor(lm, sm, lang, scheme);
+        let menubar = build_menu(
+            app,
+            &window,
+            &editor.buffer,
+            editor.view,
+            file_state,
+            panels.lexic_view,
+            panels.errors_view,
+        );
 
-   let (debugnotebook, lexic_textview, errorsnotebook, errors_textview) = create_notebooks();
-   
-    let layout =
-        create_layout(&codigo, &debugnotebook, &errorsnotebook);
+        let windowbox = Box::new(Orientation::Vertical, 0);
+        windowbox.append(&menubar);
+        windowbox.append(&layout.container);
 
-    let header =
-        create_headerbar(app);
+        window.set_titlebar(Some(&headerbar.widget));
+        window.set_child(Some(&windowbox));
 
+        Window { widget: window }
+    }
 
-    let file_state: Rc<RefCell<Option<PathBuf>>> =
-        Rc::new(RefCell::new(None));
-
-
-    let menubar = build_menu(
-        app,
-        &window,
-        &buffer,
-        view.clone(),
-        file_state,
-        lexic_textview.clone(),
-        errors_textview.clone(),
-    );
-
-
-    let windowbox = Box::new(Orientation::Vertical, 0);
-
-    windowbox.append(&menubar);
-    windowbox.append(&layout);
-
-
-    window.set_titlebar(Some(&header));
-
-    window.set_child(Some(&windowbox));
-
-    window.present();
+    pub fn present(self) {
+        self.widget.present();
+    }
 }

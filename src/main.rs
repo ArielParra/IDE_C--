@@ -1,29 +1,29 @@
-use gtk::{CssProvider, prelude::*};
-use gtk::{gio};
-use gtk::Application;
-use gtk::gdk::Display;
-
 mod file_manager;
 mod compiler;
-mod ui; 
+mod models;
+mod ui;
 
+use gtk::{CssProvider, prelude::*};
+use gtk::gdk::Display;
+use gtk::gio;
+use gtk::Application;
 
 fn main() {
-
     let app = Application::builder()
         .application_id("com.ide_cmm.ide")
         .build();
 
     app.connect_startup(|_| load_css());
-
-    app.connect_activate(|app| ui::window::build_ui(app));
+    app.connect_activate(|app| {
+        let window = ui::Window::build(&app);
+        window.present();
+    });
 
     app.run();
 }
 
 fn load_css() {
     let provider = CssProvider::new();
-
     let css = gio::File::for_path("src/styles.css");
     provider.load_from_file(&css);
 
