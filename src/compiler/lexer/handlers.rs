@@ -1,4 +1,3 @@
-use super::errors::skip_whitespace;
 use super::tokenizer::Tokenizer;
 use crate::models::{LexicalError, Token};
 
@@ -20,95 +19,111 @@ impl LexerHandlers {
         false
     }
 
-    pub fn handle_plus(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, line_out: &mut usize, column_out: &mut usize) -> Option<Token> {
-    if c != '+' {
-        return None;
-    }
-    
-    // Buscar el siguiente '+' permitiendo whitespace (incluyendo saltos de línea)
-    let mut temp_i = *i + 1;
-    let mut temp_line = line;
-    let mut temp_col = column + 1;
-    let mut found_second_plus = false;
-    
-    while temp_i < chars.len() {
-        match chars[temp_i] {
-            ' ' | '\t' => {
-                temp_i += 1;
-                temp_col += 1;
-            }
-            '\n' => {
-                temp_i += 1;
-                temp_line += 1;
-                temp_col = 1;
-            }
-            '+' => {
-                found_second_plus = true;
-                temp_i += 1;
-                temp_col += 1;
-                break;
-            }
-            _ => break,
+    pub fn handle_plus(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        line_out: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
+        if c != '+' {
+            return None;
         }
-    }
-    
-    if found_second_plus {
-        // Encontramos ++ con posible whitespace en medio
-        *i = temp_i;
-        *line_out = temp_line;
-        *column_out = temp_col;
-        Some(Tokenizer::new_token("OP", "++", line, column))
-    } else {
-        // Solo es un +
-        *i += 1;
-        *column_out = column + 1;
-        Some(Tokenizer::new_token("ARIT", "+", line, column))
-    }
-}
 
-   pub fn handle_minus(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, line_out: &mut usize, column_out: &mut usize) -> Option<Token> {
-    if c != '-' {
-        return None;
-    }
-    
-    // Buscar el siguiente '-' permitiendo whitespace (incluyendo saltos de línea)
-    let mut temp_i = *i + 1;
-    let mut temp_line = line;
-    let mut temp_col = column + 1;
-    let mut found_second_minus = false;
-    
-    while temp_i < chars.len() {
-        match chars[temp_i] {
-            ' ' | '\t' => {
-                temp_i += 1;
-                temp_col += 1;
+        // Buscar el siguiente '+' permitiendo whitespace (incluyendo saltos de línea)
+        let mut temp_i = *i + 1;
+        let mut temp_line = line;
+        let mut temp_col = column + 1;
+        let mut found_second_plus = false;
+
+        while temp_i < chars.len() {
+            match chars[temp_i] {
+                ' ' | '\t' => {
+                    temp_i += 1;
+                    temp_col += 1;
+                }
+                '\n' => {
+                    temp_i += 1;
+                    temp_line += 1;
+                    temp_col = 1;
+                }
+                '+' => {
+                    found_second_plus = true;
+                    temp_i += 1;
+                    temp_col += 1;
+                    break;
+                }
+                _ => break,
             }
-            '\n' => {
-                temp_i += 1;
-                temp_line += 1;
-                temp_col = 1;
-            }
-            '-' => {
-                found_second_minus = true;
-                temp_i += 1;
-                temp_col += 1;
-                break;
-            }
-            _ => break,
+        }
+
+        if found_second_plus {
+            // Encontramos ++ con posible whitespace en medio
+            *i = temp_i;
+            *line_out = temp_line;
+            *column_out = temp_col;
+            Some(Tokenizer::new_token("OP", "++", line, column))
+        } else {
+            // Solo es un +
+            *i += 1;
+            *column_out = column + 1;
+            Some(Tokenizer::new_token("ARIT", "+", line, column))
         }
     }
-    
-    if found_second_minus {
-        *i = temp_i;
-        *line_out = temp_line;
-        *column_out = temp_col;
-        Some(Tokenizer::new_token("OP", "--", line, column))
-    } else {
-        *i += 1;
-        *column_out = column + 1;
-        Some(Tokenizer::new_token("ARIT", "-", line, column))
+
+    pub fn handle_minus(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        line_out: &mut usize,
+        column_out: &mut usize,
+    ) -> Option<Token> {
+        if c != '-' {
+            return None;
+        }
+
+        // Buscar el siguiente '-' permitiendo whitespace (incluyendo saltos de línea)
+        let mut temp_i = *i + 1;
+        let mut temp_line = line;
+        let mut temp_col = column + 1;
+        let mut found_second_minus = false;
+
+        while temp_i < chars.len() {
+            match chars[temp_i] {
+                ' ' | '\t' => {
+                    temp_i += 1;
+                    temp_col += 1;
+                }
+                '\n' => {
+                    temp_i += 1;
+                    temp_line += 1;
+                    temp_col = 1;
+                }
+                '-' => {
+                    found_second_minus = true;
+                    temp_i += 1;
+                    temp_col += 1;
+                    break;
+                }
+                _ => break,
+            }
+        }
+
+        if found_second_minus {
+            *i = temp_i;
+            *line_out = temp_line;
+            *column_out = temp_col;
+            Some(Tokenizer::new_token("OP", "--", line, column))
+        } else {
+            *i += 1;
+            *column_out = column + 1;
+            Some(Tokenizer::new_token("ARIT", "-", line, column))
+        }
     }
-}
 
     pub fn handle_line_comment(chars: &[char], c: char, i: &mut usize, column: &mut usize) -> bool {
         if c != '/' || *i + 1 >= chars.len() || chars[*i + 1] != '/' {
@@ -356,53 +371,66 @@ impl LexerHandlers {
         Some(Tokenizer::new_token("ARIT", &c.to_string(), line, column))
     }
 
-   pub fn handle_relational(c: char, chars: &[char], line: usize, column: usize, i: &mut usize, column_out: &mut usize, line_out: &mut usize) -> Option<Token> {
-    if !Tokenizer::is_relational(c) {
-        return None;
-    }
-    
-    // Buscar el siguiente '=' permitiendo whitespace (incluyendo saltos de línea)
-    let mut temp_i = *i + 1;
-    let mut temp_line = line;
-    let mut temp_col = column + 1;
-    let mut found_equal = false;
-    
-    while temp_i < chars.len() {
-        match chars[temp_i] {
-            ' ' | '\t' => {
-                temp_i += 1;
-                temp_col += 1;
+    pub fn handle_relational(
+        c: char,
+        chars: &[char],
+        line: usize,
+        column: usize,
+        i: &mut usize,
+        column_out: &mut usize,
+        line_out: &mut usize,
+    ) -> Option<Token> {
+        if !Tokenizer::is_relational(c) {
+            return None;
+        }
+
+        // Buscar el siguiente '=' permitiendo whitespace (incluyendo saltos de línea)
+        let mut temp_i = *i + 1;
+        let mut temp_line = line;
+        let mut temp_col = column + 1;
+        let mut found_equal = false;
+
+        while temp_i < chars.len() {
+            match chars[temp_i] {
+                ' ' | '\t' => {
+                    temp_i += 1;
+                    temp_col += 1;
+                }
+                '\n' => {
+                    temp_i += 1;
+                    temp_line += 1;
+                    temp_col = 1;
+                }
+                '=' => {
+                    found_equal = true;
+                    temp_i += 1;
+                    temp_col += 1;
+                    break;
+                }
+                _ => break,
             }
-            '\n' => {
-                temp_i += 1;
-                temp_line += 1;
-                temp_col = 1;
-            }
-            '=' => {
-                found_equal = true;
-                temp_i += 1;
-                temp_col += 1;
-                break;
-            }
-            _ => break,
+        }
+
+        if found_equal {
+            // Encontramos un operador de dos caracteres (==, <=, >=)
+            let pair = format!("{}{}", c, '=');
+            *i = temp_i;
+            *line_out = temp_line;
+            *column_out = temp_col;
+            Some(Tokenizer::new_token("REL", &pair, line, column))
+        } else {
+            // Operador de un solo carácter
+            let token_type = if c == '=' { "ASIG" } else { "REL" };
+            *i += 1;
+            *column_out = column + 1;
+            Some(Tokenizer::new_token(
+                token_type,
+                &c.to_string(),
+                line,
+                column,
+            ))
         }
     }
-    
-    if found_equal {
-        // Encontramos un operador de dos caracteres (==, <=, >=)
-        let pair = format!("{}{}", c, '=');
-        *i = temp_i;
-        *line_out = temp_line;
-        *column_out = temp_col;
-        Some(Tokenizer::new_token("REL", &pair, line, column))
-    } else {
-        // Operador de un solo carácter
-        let token_type = if c == '=' { "ASIG" } else { "REL" };
-        *i += 1;
-        *column_out = column + 1;
-        Some(Tokenizer::new_token(token_type, &c.to_string(), line, column))
-    }
-}
 
     pub fn handle_symbol(
         c: char,
