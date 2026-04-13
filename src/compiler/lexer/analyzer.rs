@@ -66,11 +66,10 @@ pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
             continue;
         }
 
-        if let Some(token) = LexerHandlers::handle_relational(c, &chars, line, column, &mut i, &mut column) {
-            tokens.push(token);
-            continue;
-        }
-
+if let Some(token) = LexerHandlers::handle_relational(c, &chars, line, column, &mut i, &mut column, &mut line) {
+    tokens.push(token);
+    continue;
+}
         if let Some(token) = LexerHandlers::handle_symbol(c, line, column, &mut i, &mut column) {
             tokens.push(token);
             continue;
