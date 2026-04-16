@@ -35,19 +35,11 @@ pub fn analyze(text: &str) -> (Vec<Token>, Vec<LexicalError>) {
             continue;
         }
 
-        if let Some(result) = LexerHandlers::handle_block_comment_start(
-            c,
-            &chars,
-            line,
-            column,
-            &mut i,
-            &mut line,
-            &mut column,
-        ) {
-            if let Err(error) = result {
+        if i + 1 < chars.len() && chars[i] == '/' && chars[i + 1] == '*' {
+            if let Some(error) = LexerHandlers::consume_block_comment(&chars, &mut i, &mut line, &mut column) {
                 errors.push(error);
             }
-            continue;
+            continue; // ← crucial: saltarse el resto de manejadores
         }
 
         if let Some((token, error)) =

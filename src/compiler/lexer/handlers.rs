@@ -171,7 +171,39 @@ impl LexerHandlers {
         *column_out += 2;
         Some(Ok(()))
     }
+  pub fn consume_block_comment(
+        chars: &[char],
+        i: &mut usize,
+        line: &mut usize,
+        column: &mut usize,
+    ) -> Option<LexicalError> {
+        let start_line = *line;
+        let start_col = *column;
+        // Ya sabemos que chars[*i] == '/' y chars[*i+1] == '*'
+        *i += 2;
+        *column += 2;
 
+        while *i + 1 < chars.len() && !(chars[*i] == '*' && chars[*i + 1] == '/') {
+            if chars[*i] == '\n' {
+                *line += 1;
+                *column = 1;
+            } else {
+                *column += 1;
+            }
+            *i += 1;
+        }
+
+        if *i + 1 >= chars.len() {
+            // Comentario no cerrado
+            *i += 1; // Consumir el resto (opcional)
+            return Some(LexicalError::unclosed_block_comment(start_line, start_col));
+        }
+
+        // Consumir el '*/'
+        *i += 2;
+        *column += 2;
+        None
+    }
     pub fn handle_string(
         c: char,
         chars: &[char],
