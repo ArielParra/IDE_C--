@@ -48,6 +48,8 @@ impl Window {
             file_state,
             panels.lexic_view,
             panels.errors_view,
+            panels.syntax_errors_view,
+            panels.ast_view.clone(),
         );
 
         let windowbox = Box::new(Orientation::Vertical, 0);

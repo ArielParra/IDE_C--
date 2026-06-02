@@ -17,13 +17,25 @@ pub fn build_menu(
     file_state: FileState,
     lex_view: Rc<RefCell<TextView>>,
     errors_view: Rc<RefCell<TextView>>,
+    syntax_errors_view: Rc<RefCell<TextView>>,
+    ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
 ) -> gtk::PopoverMenuBar {
     let editor_buffer: gtk::TextBuffer = buffer.as_ref().clone();
 
     ErrorNavigator::connect_error_click(&errors_view, &editor_buffer, &editor_view);
+    ErrorNavigator::connect_error_click(&syntax_errors_view, &editor_buffer, &editor_view);
     LexicNavigator::connect_position_click(&lex_view, &editor_buffer, &editor_view);
 
-    ActionHandlers::register_all(app, window, buffer, file_state, lex_view, errors_view);
+    ActionHandlers::register_all(
+        app,
+        window,
+        buffer,
+        file_state,
+        lex_view,
+        errors_view,
+        syntax_errors_view,
+        ast_view,
+    );
 
     MenuBuilder::new()
         .add_file_menu()

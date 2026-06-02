@@ -31,6 +31,32 @@ impl LexicalError {
     }
 
     pub fn invalid_character(c: char, line: usize, column: usize) -> Self {
-        Self::new(&format!("Invalid character {}", c), line, column)
+        LexicalError::new(&format!("Invalid character {}", c), line, column)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct SyntaxError {
+    pub message: String,
+    pub line: usize,
+    pub column: usize,
+}
+
+impl SyntaxError {
+    pub fn new(message: &str, line: usize, column: usize) -> Self {
+        Self {
+            message: message.to_string(),
+            line,
+            column,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn expected_token(expected: &str, found: &str, line: usize, column: usize) -> Self {
+        SyntaxError::new(
+            &format!("Expected {}, found '{}'", expected, found),
+            line,
+            column,
+        )
     }
 }

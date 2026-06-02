@@ -19,6 +19,8 @@ impl ActionHandlers {
         file_state: Rc<RefCell<Option<PathBuf>>>,
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
+        syntax_errors_view: Rc<RefCell<TextView>>,
+        ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     ) {
         let text_buffer: gtk::TextBuffer = buffer.as_ref().clone();
         let buffer_clone = text_buffer.clone();
@@ -26,6 +28,7 @@ impl ActionHandlers {
         Self::register_file_actions(app, &window, &buffer_clone, file_state.clone());
         Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view);
         Self::register_compile_action(app, file_state);
+        Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view);
     }
 
     fn register_file_actions(
@@ -176,6 +179,63 @@ impl ActionHandlers {
         });
 
         app.add_action(&lexical_action);
+    }
+
+    fn register_syntax_action(
+        app: &Application,
+        buffer: &gtk::TextBuffer,
+        syntax_errors_view: Rc<RefCell<TextView>>,
+        ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
+    ) {
+        let syntax_action = gio::SimpleAction::new("syntax", None);
+        let buffer_clone = buffer.clone();
+        let syntax_errors_view_clone = syntax_errors_view.clone();
+        let ast_view_clone = ast_view.clone();
+
+        syntax_action.connect_activate(move |_, _| {
+            let text = buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
+            let (_tokens, lexical_errors) = crate::compiler::lexer::analyze(&text);
+            let err_buffer = syntax_errors_view_clone.borrow().buffer();
+            err_buffer.set_text("");
+
+            if !lexical_errors.is_empty() {
+                err_buffer.set_text("Lexical errors found. Please run Lexical Analysis first.");
+                return;
+            }
+
+            let (ast, syntax_errors) = crate::compiler::build_ast_with_errors(&text);
+            ast_view_clone.borrow().populate(&ast);
+
+            let error_link_tag = err_buffer.create_tag(
+                None,
+                &[
+                    ("foreground", &"#1a73e8"),
+                    ("underline", &Underline::Single),
+                ],
+            );
+
+            if syntax_errors.is_empty() {
+                err_buffer.set_text("No syntax errors detected.");
+            } else {
+                for error in &syntax_errors {
+                    let mut message_iter = err_buffer.end_iter();
+                    err_buffer.insert(&mut message_iter, &format!("Syntax error: {} ", error.message));
+
+                    let mut link_iter = err_buffer.end_iter();
+                    let link_text = format!("({}:{})", error.line, error.column);
+                    if let Some(ref tag) = error_link_tag {
+                        err_buffer.insert_with_tags(&mut link_iter, &link_text, &[tag]);
+                    } else {
+                        err_buffer.insert(&mut link_iter, &link_text);
+                    }
+
+                    let mut newline_iter = err_buffer.end_iter();
+                    err_buffer.insert(&mut newline_iter, "\n");
+                }
+            }
+        });
+
+        app.add_action(&syntax_action);
     }
 
     fn register_compile_action(app: &Application, file_state: Rc<RefCell<Option<PathBuf>>>) {

@@ -11,6 +11,7 @@ impl Tokenizer {
         match lexeme {
             "if" => "IF",
             "else" => "ELSE",
+            "then" => "THEN",
             "end" => "END",
             "do" => "DO",
             "while" => "WHILE",
@@ -42,7 +43,7 @@ impl Tokenizer {
             return None;
         }
         let pair: String = chars[i..i + 2].iter().collect();
-        if ["&&", "||"].contains(&pair.as_str()) {
+        if ["&&", "||", ">>", "<<"].contains(&pair.as_str()) {
             Some(pair)
         } else {
             None

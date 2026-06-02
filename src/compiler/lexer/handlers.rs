@@ -138,6 +138,7 @@ impl LexerHandlers {
         true
     }
 
+    #[allow(dead_code)]
     pub fn handle_block_comment_start(
         c: char,
         chars: &[char],
