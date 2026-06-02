@@ -1,13 +1,24 @@
 use gtk::prelude::*;
-use gtk::{ApplicationWindow, FileDialog};
+use gtk::{ApplicationWindow, FileDialog, TextView};
+use std::cell::RefCell;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
+use std::rc::Rc;
 
 use crate::models::FileState;
 
-pub fn new_file(buffer: &gtk::TextBuffer, current_file: FileState) {
+pub fn new_file(
+    buffer: &gtk::TextBuffer,
+    current_file: FileState,
+    lex_view: Rc<RefCell<TextView>>,
+    errors_view: Rc<RefCell<TextView>>,
+    syntax_errors_view: Rc<RefCell<TextView>>,
+) {
     buffer.set_text("");
+    lex_view.borrow().buffer().set_text("");
+    errors_view.borrow().buffer().set_text("");
+    syntax_errors_view.borrow().buffer().set_text("");
     *current_file.borrow_mut() = None;
 }
 
@@ -15,6 +26,9 @@ pub fn open_file_dialog(
     window: &ApplicationWindow,
     buffer: gtk::TextBuffer,
     current_file: FileState,
+    lex_view: Rc<RefCell<TextView>>,
+    errors_view: Rc<RefCell<TextView>>,
+    syntax_errors_view: Rc<RefCell<TextView>>,
 ) {
     let dialog = FileDialog::builder().title("Open File").modal(true).build();
 
@@ -28,6 +42,9 @@ pub fn open_file_dialog(
                         Ok(bytes) => {
                             let contents = String::from_utf8_lossy(&bytes);
                             buffer.set_text(&contents);
+                            lex_view.borrow().buffer().set_text("");
+                            errors_view.borrow().buffer().set_text("");
+                            syntax_errors_view.borrow().buffer().set_text("");
                             *current_file.borrow_mut() = Some(path);
                         }
                         Err(e) => {

@@ -25,7 +25,15 @@ impl ActionHandlers {
         let text_buffer: gtk::TextBuffer = buffer.as_ref().clone();
         let buffer_clone = text_buffer.clone();
 
-        Self::register_file_actions(app, &window, &buffer_clone, file_state.clone());
+        Self::register_file_actions(
+            app,
+            &window,
+            &buffer_clone,
+            file_state.clone(),
+            lex_view.clone(),
+            errors_view.clone(),
+            syntax_errors_view.clone(),
+        );
         Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view);
         Self::register_compile_action(app, file_state);
         Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view);
@@ -36,12 +44,24 @@ impl ActionHandlers {
         window: &ApplicationWindow,
         buffer: &gtk::TextBuffer,
         file_state: Rc<RefCell<Option<PathBuf>>>,
+        lex_view: Rc<RefCell<TextView>>,
+        errors_view: Rc<RefCell<TextView>>,
+        syntax_errors_view: Rc<RefCell<TextView>>,
     ) {
         let buffer_clone = buffer.clone();
         let new_action = gio::SimpleAction::new("new", None);
         let file_state_clone = file_state.clone();
+        let lex_view_clone = lex_view.clone();
+        let errors_view_clone = errors_view.clone();
+        let syntax_errors_view_clone = syntax_errors_view.clone();
         new_action.connect_activate(move |_, _| {
-            file_manager::file_ops::new_file(&buffer_clone, file_state_clone.clone());
+            file_manager::file_ops::new_file(
+                &buffer_clone,
+                file_state_clone.clone(),
+                lex_view_clone.clone(),
+                errors_view_clone.clone(),
+                syntax_errors_view_clone.clone(),
+            );
         });
         app.add_action(&new_action);
 
@@ -49,11 +69,17 @@ impl ActionHandlers {
         let window_clone = window.clone();
         let buffer_clone = buffer.clone();
         let file_state_clone = file_state.clone();
+        let lex_view_clone = lex_view.clone();
+        let errors_view_clone = errors_view.clone();
+        let syntax_errors_view_clone = syntax_errors_view.clone();
         open_action.connect_activate(move |_, _| {
             file_manager::file_ops::open_file_dialog(
                 &window_clone,
                 buffer_clone.clone(),
                 file_state_clone.clone(),
+                lex_view_clone.clone(),
+                errors_view_clone.clone(),
+                syntax_errors_view_clone.clone(),
             );
         });
         app.add_action(&open_action);
@@ -119,7 +145,7 @@ impl ActionHandlers {
             lex_buffer.set_text("");
 
             let link_tag = lex_buffer.create_tag(
-                Some("link"),
+                None,
                 &[
                     ("foreground", &"#1a73e8"),
                     ("underline", &Underline::Single),
@@ -199,7 +225,20 @@ impl ActionHandlers {
             err_buffer.set_text("");
 
             if !lexical_errors.is_empty() {
-                err_buffer.set_text("Lexical errors found. Please run Lexical Analysis first.");
+                let error_tag = err_buffer.create_tag(
+                    None,
+                    &[
+                        ("foreground", &"#f44747"),
+                        ("weight", &700i32),
+                    ],
+                );
+                let mut iter = err_buffer.end_iter();
+                let message = "⚠ Error: Lexical errors found. Please run Lexical Analysis first.";
+                if let Some(ref tag) = error_tag {
+                    err_buffer.insert_with_tags(&mut iter, message, &[tag]);
+                } else {
+                    err_buffer.insert(&mut iter, message);
+                }
                 return;
             }
 

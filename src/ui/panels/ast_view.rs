@@ -2,11 +2,13 @@ use gtk::prelude::*;
 #[allow(deprecated)]
 use gtk::{CellRendererText, ScrolledWindow, TreeIter, TreeStore, TreeView, TreeViewColumn};
 use crate::models::ast::AstNode;
+use crate::ui::language_style::LanguageStyle;
 
 #[allow(deprecated)]
 pub struct AstView {
     pub tree_view: TreeView,
     store: TreeStore,
+    is_dark: bool,
 }
 
 impl AstView {
@@ -27,7 +29,8 @@ impl AstView {
         tree_view.set_show_expanders(true);
         tree_view.set_activate_on_single_click(true);
 
-        AstView { tree_view, store }
+        let is_dark = LanguageStyle::is_dark_mode();
+        AstView { tree_view, store, is_dark }
     }
 
     pub fn widget(&self) -> ScrolledWindow {
@@ -53,7 +56,7 @@ impl AstView {
             None => self.store.append(None),
         };
 
-        let color = Self::label_color(&node.label);
+        let color = Self::label_color(&node.label, self.is_dark);
         self.store.set(&iter, &[(0, &node.label), (1, &color)]);
 
         for child in &node.children {
@@ -61,15 +64,21 @@ impl AstView {
         }
     }
 
-    fn label_color(label: &str) -> &str {
+    fn label_color(label: &str, is_dark: bool) -> String {
+        let (error, id, literal, type_color, statement, operator) = if is_dark {
+            ("#f44747", "#ff57f4", "#b5cea8", "#dcdcaa", "#569cd6", "#c586c0")
+        } else {
+            ("#d91919", "#d91663", "#007c3d", "#aa6502", "#0066cc", "#a0108d")
+        };
+
         if label.contains("Error") || label.contains("Unexpected") {
-            "#f44747"
+            error.to_string()
         } else if label.starts_with("id:") {
-            "#ff57f4"
+            id.to_string()
         } else if label.starts_with("number:") || label.starts_with("string:") || label.starts_with("bool:") {
-            "#b5cea8"
+            literal.to_string()
         } else if label.starts_with("type:") {
-            "#dcdcaa"
+            type_color.to_string()
         } else if label.contains("Assignment")
             || label.contains("Expression")
             || label.contains("Selection")
@@ -80,7 +89,7 @@ impl AstView {
             || label.contains("Declaration")
             || label.contains("Block")
         {
-            "#569cd6"
+            statement.to_string()
         } else if label.contains("Postfix")
             || label.contains("Prefix")
             || label.contains("AddOp")
@@ -89,9 +98,13 @@ impl AstView {
             || label.contains("Logical")
             || label.contains("Power")
         {
-            "#c586c0"
+            operator.to_string()
         } else {
-            "#ffffff"
+            if is_dark {
+                "#ffffff".to_string()
+            } else {
+                "#000000".to_string()
+            }
         }
     }
 
