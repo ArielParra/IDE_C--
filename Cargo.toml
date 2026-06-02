@@ -7,3 +7,6 @@ edition = "2024"
 glib = "0.22.3"
 gtk = { package = "gtk4", version = "0.7", features = ["v4_10"]}
 sourceview5 = "0.7"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.52"
