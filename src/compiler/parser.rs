@@ -97,10 +97,12 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_program(&mut self) -> AstNode {
-        let mut node = AstNode::new("MainProgram");
+        let (prog_line, prog_col) = self.location_or_zero();
+        let mut node = AstNode::new("MainProgram").with_pos(prog_line, prog_col);
 
         if self.match_type("MAIN") {
-            node.add_child(AstNode::new("main"));
+            let prev = self.previous().unwrap();
+            node.add_child(AstNode::new("main").with_pos(prev.line, prev.column));
         } else {
             let (line, column) = self.location_or_zero();
             self.errors.push(SyntaxError::new("Expected 'main'", line, column));
@@ -142,14 +144,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_variable_declaration(&mut self) -> AstNode {
-        let mut node = AstNode::new("VariableDeclaration");
+        let (decl_line, decl_col) = self.location_or_zero();
+        let mut node = AstNode::new("VariableDeclaration").with_pos(decl_line, decl_col);
         if let Some(token) = self.advance() {
-            node.add_child(AstNode::new(format!("type: {}", token.lexeme)));
+            node.add_child(AstNode::new(format!("type: {}", token.lexeme)).with_pos(token.line, token.column));
         }
 
         let mut ids = AstNode::new("Identifiers");
         if self.check_type("ID") {
-            ids.add_child(AstNode::new(self.current().unwrap().lexeme.clone()));
+            let token = self.current().unwrap();
+            ids.add_child(AstNode::new(token.lexeme.clone()).with_pos(token.line, token.column));
             self.advance();
         } else {
             let (line, column) = self.location_or_zero();
@@ -158,7 +162,8 @@ impl<'a> Parser<'a> {
 
         while self.match_lexeme("SYM", ",") {
             if self.check_type("ID") {
-                ids.add_child(AstNode::new(self.current().unwrap().lexeme.clone()));
+                let token = self.current().unwrap();
+                ids.add_child(AstNode::new(token.lexeme.clone()).with_pos(token.line, token.column));
                 self.advance();
             } else {
                 let (line, column) = self.location_or_zero();
@@ -205,22 +210,27 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_statement(&mut self) -> AstNode {
+        let (line, column) = if let Some(token) = self.current() {
+            (Some(token.line), Some(token.column))
+        } else {
+            (None, None)
+        };
         match self.current().map(|t| t.token_type.as_str()) {
-            Some("IF") => self.parse_selection(),
-            Some("WHILE") => self.parse_iteration(),
-            Some("DO") => self.parse_repetition(),
-            Some("CIN") => self.parse_input(),
-            Some("COUT") => self.parse_output(),
-            Some("ID") => self.parse_id_statement(),
+            Some("IF") => self.parse_selection().with_opt_pos(line, column),
+            Some("WHILE") => self.parse_iteration().with_opt_pos(line, column),
+            Some("DO") => self.parse_repetition().with_opt_pos(line, column),
+            Some("CIN") => self.parse_input().with_opt_pos(line, column),
+            Some("COUT") => self.parse_output().with_opt_pos(line, column),
+            Some("ID") => self.parse_id_statement().with_opt_pos(line, column),
             Some(_token_type) => {
-                let (line, column, found) = self.location_details();
+                let (line_val, column_val, found) = self.location_details();
                 self.errors.push(SyntaxError::new(
                     &format!("Unexpected token '{}' in statement", found),
-                    line,
-                    column,
+                    line_val,
+                    column_val,
                 ));
                 self.advance();
-                AstNode::new("UnknownStatement")
+                AstNode::new("UnknownStatement").with_pos(line_val, column_val)
             }
             None => AstNode::new("EmptyStatement"),
         }
@@ -228,16 +238,17 @@ impl<'a> Parser<'a> {
 
     fn parse_id_statement(&mut self) -> AstNode {
         let id_name = self.current().unwrap().lexeme.clone();
-        let (_id_line, _id_col) = (self.current().unwrap().line, self.current().unwrap().column);
+        let (id_line, id_col) = (self.current().unwrap().line, self.current().unwrap().column);
         self.advance();
 
         // Check for postfix operators (++ or --)
         if self.check_lexeme("OP", "++") || self.check_lexeme("OP", "--") {
             let op = self.current().unwrap().lexeme.clone();
+            let (op_line, op_col) = (self.current().unwrap().line, self.current().unwrap().column);
             self.advance();
-            let mut node = AstNode::new("ExpressionStatement");
-            let mut expr_node = AstNode::new(format!("Postfix({})", op));
-            expr_node.add_child(AstNode::new(format!("id: {}", id_name)));
+            let mut node = AstNode::new("ExpressionStatement").with_pos(id_line, id_col);
+            let mut expr_node = AstNode::new(format!("Postfix({})", op)).with_pos(op_line, op_col);
+            expr_node.add_child(AstNode::new(format!("id: {}", id_name)).with_pos(id_line, id_col));
             node.add_child(expr_node);
             if !self.match_lexeme("SYM", ";") {
                 let (line, column) = self.location_or_zero();
@@ -247,8 +258,8 @@ impl<'a> Parser<'a> {
         }
 
         // Otherwise it's an assignment
-        let mut node = AstNode::new("Assignment");
-        node.add_child(AstNode::new(format!("id: {}", id_name)));
+        let mut node = AstNode::new("Assignment").with_pos(id_line, id_col);
+        node.add_child(AstNode::new(format!("id: {}", id_name)).with_pos(id_line, id_col));
 
         if !self.match_type("ASIG") {
             let (line, column) = self.location_or_zero();
@@ -275,9 +286,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_selection(&mut self) -> AstNode {
-        let mut node = AstNode::new("Selection");
+        let (line_val, col_val) = self.location_or_zero();
+        let mut node = AstNode::new("Selection").with_pos(line_val, col_val);
         self.advance();
-        node.add_child(AstNode::new("if"));
+        node.add_child(AstNode::new("if").with_pos(line_val, col_val));
         node.add_child(self.parse_expression());
 
         if !self.match_type("THEN") {
@@ -317,9 +329,10 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_iteration(&mut self) -> AstNode {
-        let mut node = AstNode::new("Iteration");
+        let (line_val, col_val) = self.location_or_zero();
+        let mut node = AstNode::new("Iteration").with_pos(line_val, col_val);
         self.advance();
-        node.add_child(AstNode::new("while"));
+        node.add_child(AstNode::new("while").with_pos(line_val, col_val));
         node.add_child(self.parse_expression());
 
         let mut body = AstNode::new("WhileBody");
@@ -342,7 +355,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_repetition(&mut self) -> AstNode {
-        let mut node = AstNode::new("Repetition");
+        let (line_val, col_val) = self.location_or_zero();
+        let mut node = AstNode::new("Repetition").with_pos(line_val, col_val);
         self.advance();
         let mut body = AstNode::new("DoBody");
         while !self.at_end() && !self.check_type("WHILE") {
@@ -360,18 +374,13 @@ impl<'a> Parser<'a> {
         }
         node.add_child(self.parse_expression());
         
-        // Grammar: repeticion → do lista_sentencias while expresion
-        // NO semicolon expected after expression
-        if self.check_lexeme("SYM", ";") {
-            let (line, column) = self.location_or_zero();
-            self.errors.push(SyntaxError::new("Unexpected ';' after while expression in do-while", line, column));
-            self.advance();
-        }
+        if self.match_lexeme("SYM", ";") {}
         node
     }
 
     fn parse_input(&mut self) -> AstNode {
-        let mut node = AstNode::new("Input");
+        let (line_val, col_val) = self.location_or_zero();
+        let mut node = AstNode::new("Input").with_pos(line_val, col_val);
         self.advance();
         if !self.match_lexeme("OP", ">>") {
             let (line, column) = self.location_or_zero();
@@ -380,7 +389,7 @@ impl<'a> Parser<'a> {
 
         if let Some(token) = self.current() {
             if token.token_type == "ID" {
-                node.add_child(AstNode::new(format!("id: {}", token.lexeme)));
+                node.add_child(AstNode::new(format!("id: {}", token.lexeme)).with_pos(token.line, token.column));
                 self.advance();
             } else {
                 let (line, column) = self.location_or_zero();
@@ -397,7 +406,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_output(&mut self) -> AstNode {
-        let mut node = AstNode::new("Output");
+        let (line_val, col_val) = self.location_or_zero();
+        let mut node = AstNode::new("Output").with_pos(line_val, col_val);
         self.advance();
 
         if !self.match_lexeme("OP", "<<") {
@@ -419,9 +429,11 @@ impl<'a> Parser<'a> {
 
     fn parse_output_operand(&mut self) -> AstNode {
         if self.check_type("STRING") {
-            let lexeme = self.current().unwrap().lexeme.clone();
+            let token = self.current().unwrap();
+            let lexeme = token.lexeme.clone();
+            let (t_line, t_col) = (token.line, token.column);
             self.advance();
-            AstNode::new(format!("string: {}", lexeme))
+            AstNode::new(format!("string: {}", lexeme)).with_pos(t_line, t_col)
         } else {
             self.parse_expression()
         }
@@ -434,7 +446,8 @@ impl<'a> Parser<'a> {
     fn parse_logical_or(&mut self) -> AstNode {
         let mut node = self.parse_logical_and();
         while self.check_lexeme("OP", "||") {
-            let mut op_node = AstNode::new("LogicalOr");
+            let token = self.current().unwrap();
+            let mut op_node = AstNode::new("LogicalOr").with_pos(token.line, token.column);
             self.advance();
             op_node.add_child(node);
             op_node.add_child(self.parse_logical_and());
@@ -446,7 +459,8 @@ impl<'a> Parser<'a> {
     fn parse_logical_and(&mut self) -> AstNode {
         let mut node = self.parse_relational();
         while self.check_lexeme("OP", "&&") {
-            let mut op_node = AstNode::new("LogicalAnd");
+            let token = self.current().unwrap();
+            let mut op_node = AstNode::new("LogicalAnd").with_pos(token.line, token.column);
             self.advance();
             op_node.add_child(node);
             op_node.add_child(self.parse_relational());
@@ -458,9 +472,10 @@ impl<'a> Parser<'a> {
     fn parse_relational(&mut self) -> AstNode {
         let mut node = self.parse_simple_expression();
         if self.check_type("REL") {
-            let op = self.current().unwrap().lexeme.clone();
+            let token = self.current().unwrap();
+            let op = token.lexeme.clone();
+            let mut op_node = AstNode::new(format!("Relational({})", op)).with_pos(token.line, token.column);
             self.advance();
-            let mut op_node = AstNode::new(format!("Relational({})", op));
             op_node.add_child(node);
             op_node.add_child(self.parse_simple_expression());
             node = op_node;
@@ -473,15 +488,15 @@ impl<'a> Parser<'a> {
         while let Some(token) = self.current() {
             if token.token_type == "ARIT" && (token.lexeme == "+" || token.lexeme == "-") {
                 let op = token.lexeme.clone();
+                let mut op_node = AstNode::new(format!("AddOp({})", op)).with_pos(token.line, token.column);
                 self.advance();
-                let mut op_node = AstNode::new(format!("AddOp({})", op));
                 op_node.add_child(node);
                 op_node.add_child(self.parse_term());
                 node = op_node;
             } else if token.token_type == "OP" && (token.lexeme == "++" || token.lexeme == "--") {
                 let op = token.lexeme.clone();
+                let mut op_node = AstNode::new(format!("UnaryOp({})", op)).with_pos(token.line, token.column);
                 self.advance();
-                let mut op_node = AstNode::new(format!("UnaryOp({})", op));
                 op_node.add_child(node);
                 node = op_node;
             } else {
@@ -496,8 +511,8 @@ impl<'a> Parser<'a> {
         while let Some(token) = self.current() {
             if token.token_type == "ARIT" && (token.lexeme == "*" || token.lexeme == "/" || token.lexeme == "%") {
                 let op = token.lexeme.clone();
+                let mut op_node = AstNode::new(format!("MulOp({})", op)).with_pos(token.line, token.column);
                 self.advance();
-                let mut op_node = AstNode::new(format!("MulOp({})", op));
                 op_node.add_child(node);
                 op_node.add_child(self.parse_factor());
                 node = op_node;
@@ -511,8 +526,9 @@ impl<'a> Parser<'a> {
     fn parse_factor(&mut self) -> AstNode {
         let mut node = self.parse_power();
         while self.check_type("ARIT") && self.current().unwrap().lexeme == "^" {
+            let token = self.current().unwrap();
+            let mut op_node = AstNode::new("Power").with_pos(token.line, token.column);
             self.advance();
-            let mut op_node = AstNode::new("Power");
             op_node.add_child(node);
             op_node.add_child(self.parse_power());
             node = op_node;
@@ -522,16 +538,18 @@ impl<'a> Parser<'a> {
 
     fn parse_power(&mut self) -> AstNode {
         if self.check_lexeme("OP", "++") || self.check_lexeme("OP", "--") {
-            let op = self.current().unwrap().lexeme.clone();
+            let token = self.current().unwrap();
+            let op = token.lexeme.clone();
+            let mut node = AstNode::new(format!("Prefix({})", op)).with_pos(token.line, token.column);
             self.advance();
-            let mut node = AstNode::new(format!("Prefix({})", op));
             node.add_child(self.parse_power());
             return node;
         }
 
         if self.check_lexeme("REL", "!") {
+            let token = self.current().unwrap();
+            let mut node = AstNode::new("Not").with_pos(token.line, token.column);
             self.advance();
-            let mut node = AstNode::new("Not");
             node.add_child(self.parse_power());
             return node;
         }
@@ -553,23 +571,27 @@ impl<'a> Parser<'a> {
             let node = match token.token_type.as_str() {
                 "INT" | "FLOAT" => {
                     let value = token.lexeme.clone();
+                    let (t_line, t_col) = (token.line, token.column);
                     self.advance();
-                    AstNode::new(format!("number: {}", value))
+                    AstNode::new(format!("number: {}", value)).with_pos(t_line, t_col)
                 }
                 "TRUE" | "FALSE" => {
                     let value = token.lexeme.clone();
+                    let (t_line, t_col) = (token.line, token.column);
                     self.advance();
-                    AstNode::new(format!("bool: {}", value))
+                    AstNode::new(format!("bool: {}", value)).with_pos(t_line, t_col)
                 }
                 "ID" => {
                     let value = token.lexeme.clone();
+                    let (t_line, t_col) = (token.line, token.column);
                     self.advance();
-                    AstNode::new(format!("id: {}", value))
+                    AstNode::new(format!("id: {}", value)).with_pos(t_line, t_col)
                 }
                 "STRING" => {
                     let value = token.lexeme.clone();
+                    let (t_line, t_col) = (token.line, token.column);
                     self.advance();
-                    AstNode::new(format!("string: {}", value))
+                    AstNode::new(format!("string: {}", value)).with_pos(t_line, t_col)
                 }
                 _ => {
                     let (line, column, found) = self.location_details();
@@ -579,14 +601,15 @@ impl<'a> Parser<'a> {
                         column,
                     ));
                     self.advance();
-                    AstNode::new("ErrorComponent")
+                    AstNode::new("ErrorComponent").with_pos(line, column)
                 }
             };
 
             if self.check_lexeme("OP", "++") || self.check_lexeme("OP", "--") {
-                let op = self.current().unwrap().lexeme.clone();
+                let op_token = self.current().unwrap();
+                let op = op_token.lexeme.clone();
+                let mut op_node = AstNode::new(format!("Postfix({})", op)).with_pos(op_token.line, op_token.column);
                 self.advance();
-                let mut op_node = AstNode::new(format!("Postfix({})", op));
                 op_node.add_child(node);
                 return op_node;
             }
@@ -597,7 +620,7 @@ impl<'a> Parser<'a> {
         let (line, column) = self.location_or_zero();
         self.errors
             .push(SyntaxError::new("Unexpected end of expression", line, column));
-        AstNode::new("Empty")
+        AstNode::new("Empty").with_pos(line, column)
     }
 
     fn match_lexeme(&mut self, token_type: &str, lexeme: &str) -> bool {

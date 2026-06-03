@@ -1,0 +1,30 @@
+main {
+    int val, limit, res;
+    float base, result;
+    bool active;
+
+    base = 2.0;
+    res = 1;
+    active = true;
+
+    cin >> limit;
+    
+    if (limit > 0) then
+        val = 0;
+        while (val < limit)
+            res = res * 2;
+            val++;
+        end;
+        result = base ^ 3;
+    else
+        res = 0;
+        active = false;
+    end;
+
+    do
+        limit--;
+    while (limit > 0);
+
+    cout << "Resultado: " << res << " " << result << "\n";
+    cout << "Activo: " << active << "\n";
+}

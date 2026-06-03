@@ -50,6 +50,8 @@ impl Window {
             panels.errors_view,
             panels.syntax_errors_view,
             panels.ast_view.clone(),
+            panels.debug.clone(),
+            panels.errors.clone(),
         );
 
         let windowbox = Box::new(Orientation::Vertical, 0);

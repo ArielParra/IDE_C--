@@ -14,7 +14,12 @@ pub struct AstView {
 impl AstView {
     #[allow(deprecated)]
     pub fn new() -> Self {
-        let store = TreeStore::new(&[String::static_type(), String::static_type()]);
+        let store = TreeStore::new(&[
+            String::static_type(),
+            String::static_type(),
+            u32::static_type(),
+            u32::static_type(),
+        ]);
         let tree_view = TreeView::with_model(&store);
 
         let renderer = CellRendererText::new();
@@ -57,7 +62,17 @@ impl AstView {
         };
 
         let color = Self::label_color(&node.label, self.is_dark);
-        self.store.set(&iter, &[(0, &node.label), (1, &color)]);
+        let line = node.line.unwrap_or(0) as u32;
+        let column = node.column.unwrap_or(0) as u32;
+        self.store.set(
+            &iter,
+            &[
+                (0, &node.label),
+                (1, &color),
+                (2, &line),
+                (3, &column),
+            ],
+        );
 
         for child in &node.children {
             self.insert_node(Some(&iter), child);
@@ -65,22 +80,47 @@ impl AstView {
     }
 
     fn label_color(label: &str, is_dark: bool) -> String {
-        let (error, id, literal, type_color, statement, operator) = if is_dark {
-            ("#f44747", "#ff57f4", "#b5cea8", "#dcdcaa", "#569cd6", "#c586c0")
+        let (error, id, number, string, bool_val, type_color, statement, operator, relational) = if is_dark {
+            (
+                "#f44747", // error
+                "#ff57f4", // id
+                "#b5cea8", // number
+                "#ce9178", // string
+                "#569cd6", // bool
+                "#569cd6", // type
+                "#569cd6", // statement
+                "#f44747", // operator
+                "#569cd6", // relational
+            )
         } else {
-            ("#d91919", "#d91663", "#007c3d", "#aa6502", "#0066cc", "#a0108d")
+            (
+                "#d91919", // error
+                "#000000", // id
+                "#098658", // number
+                "#a31515", // string
+                "#0000ff", // bool
+                "#0000ff", // type
+                "#0000ff", // statement
+                "#000000", // operator
+                "#0000ff", // relational
+            )
         };
 
-        if label.contains("Error") || label.contains("Unexpected") {
+        if label.contains("Error") || label.contains("Unexpected") || label.contains("Unknown") {
             error.to_string()
         } else if label.starts_with("id:") {
             id.to_string()
-        } else if label.starts_with("number:") || label.starts_with("string:") || label.starts_with("bool:") {
-            literal.to_string()
+        } else if label.starts_with("number:") {
+            number.to_string()
+        } else if label.starts_with("string:") {
+            string.to_string()
+        } else if label.starts_with("bool:") {
+            bool_val.to_string()
         } else if label.starts_with("type:") {
             type_color.to_string()
-        } else if label.contains("Assignment")
-            || label.contains("Expression")
+        } else if label == "main" || label == "if" || label == "while" || label == "do" {
+            statement.to_string()
+        } else if label.contains("Expression")
             || label.contains("Selection")
             || label.contains("Iteration")
             || label.contains("Repetition")
@@ -90,11 +130,14 @@ impl AstView {
             || label.contains("Block")
         {
             statement.to_string()
-        } else if label.contains("Postfix")
+        } else if label.contains("Relational") || label == "Not" {
+            relational.to_string()
+        } else if label.contains("Assignment")
+            || label.contains("Postfix")
             || label.contains("Prefix")
+            || label.contains("UnaryOp")
             || label.contains("AddOp")
             || label.contains("MulOp")
-            || label.contains("Relational")
             || label.contains("Logical")
             || label.contains("Power")
         {

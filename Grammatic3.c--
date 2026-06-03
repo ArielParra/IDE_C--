@@ -1,0 +1,19 @@
+main {
+    int a, b
+    float x;
+    bool active;
+
+    a = 5;
+    b = (a * 2;
+
+    if (a > 0) 
+        x = 3.14;
+    end;
+
+    do
+        x = x + 1.0;
+    (x < 10.0);
+
+    cin >> ;
+    cout << "Final: " << x;
+}

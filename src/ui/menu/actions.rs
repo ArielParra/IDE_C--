@@ -21,6 +21,8 @@ impl ActionHandlers {
         errors_view: Rc<RefCell<TextView>>,
         syntax_errors_view: Rc<RefCell<TextView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
+        debug_notebook: gtk::Notebook,
+        errors_notebook: gtk::Notebook,
     ) {
         let text_buffer: gtk::TextBuffer = buffer.as_ref().clone();
         let buffer_clone = text_buffer.clone();
@@ -34,9 +36,9 @@ impl ActionHandlers {
             errors_view.clone(),
             syntax_errors_view.clone(),
         );
-        Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view);
+        Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view, debug_notebook.clone(), errors_notebook.clone());
         Self::register_compile_action(app, file_state);
-        Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view);
+        Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view, debug_notebook, errors_notebook);
     }
 
     fn register_file_actions(
@@ -130,6 +132,8 @@ impl ActionHandlers {
         buffer: &gtk::TextBuffer,
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
+        debug_notebook: gtk::Notebook,
+        _errors_notebook: gtk::Notebook,
     ) {
         let lexical_action = gio::SimpleAction::new("lexical", None);
         let buffer_clone = buffer.clone();
@@ -137,6 +141,8 @@ impl ActionHandlers {
         let err_view_clone = errors_view.clone();
 
         lexical_action.connect_activate(move |_, _| {
+            debug_notebook.set_current_page(Some(1));
+
             let text =
                 buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
             let (tokens, errors) = compiler::analyze(&text);
@@ -212,6 +218,8 @@ impl ActionHandlers {
         buffer: &gtk::TextBuffer,
         syntax_errors_view: Rc<RefCell<TextView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
+        debug_notebook: gtk::Notebook,
+        _errors_notebook: gtk::Notebook,
     ) {
         let syntax_action = gio::SimpleAction::new("syntax", None);
         let buffer_clone = buffer.clone();
@@ -219,6 +227,8 @@ impl ActionHandlers {
         let ast_view_clone = ast_view.clone();
 
         syntax_action.connect_activate(move |_, _| {
+            debug_notebook.set_current_page(Some(1));
+
             let text = buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
             let (_tokens, lexical_errors) = crate::compiler::lexer::analyze(&text);
             let err_buffer = syntax_errors_view_clone.borrow().buffer();

@@ -6,7 +6,7 @@ use std::rc::Rc;
 
 use super::actions::ActionHandlers;
 use super::builder::MenuBuilder;
-use super::navigator::{ErrorNavigator, LexicNavigator};
+use super::navigator::{ErrorNavigator, LexicNavigator, AstNavigator};
 use crate::models::FileState;
 
 pub fn build_menu(
@@ -19,12 +19,15 @@ pub fn build_menu(
     errors_view: Rc<RefCell<TextView>>,
     syntax_errors_view: Rc<RefCell<TextView>>,
     ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
+    debug_notebook: gtk::Notebook,
+    errors_notebook: gtk::Notebook,
 ) -> gtk::PopoverMenuBar {
     let editor_buffer: gtk::TextBuffer = buffer.as_ref().clone();
 
     ErrorNavigator::connect_error_click(&errors_view, &editor_buffer, &editor_view);
     ErrorNavigator::connect_error_click(&syntax_errors_view, &editor_buffer, &editor_view);
     LexicNavigator::connect_position_click(&lex_view, &editor_buffer, &editor_view);
+    AstNavigator::connect_ast_click(&ast_view, &editor_buffer, &editor_view);
 
     ActionHandlers::register_all(
         app,
@@ -35,6 +38,8 @@ pub fn build_menu(
         errors_view,
         syntax_errors_view,
         ast_view,
+        debug_notebook,
+        errors_notebook,
     );
 
     MenuBuilder::new()
