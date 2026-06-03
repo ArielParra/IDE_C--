@@ -1,0 +1,65 @@
+# =============================================
+# Windows cross-compilation via quasi-msys2
+# Debian slim base — native Clang/LLD, no Wine.
+#
+# Usage:
+#   docker build -f Dockerfile.msys2 -t ide-cmm-msys2 .
+#   docker run --rm -v "$(pwd)":/build ide-cmm-msys2
+#
+# Output: IDE_C--_windows.zip in your working directory
+# =============================================
+FROM debian:bookworm-slim
+
+# quasi-msys2 deps plus a native compiler and MinGW binutils. Without native
+# Clang/LLD or Wine, quasi-msys2 falls back to MSYS2 GCC, which cannot run in
+# this image. Rust's windows-sys crate also needs x86_64-w64-mingw32-dlltool.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        make wget tar zstd gawk gpg gpgv \
+        git zip curl ca-certificates pkg-config \
+        clang lld llvm binutils-mingw-w64-x86-64 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust natively
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+        | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:$PATH"
+
+# Clone quasi-msys2
+RUN git clone --depth=1 https://github.com/holyblackcat/quasi-msys2 /opt/quasi-msys2
+
+# Install only the MSYS2 packages we need
+RUN cd /opt/quasi-msys2 && make install \
+        mingw-w64-ucrt-x86_64-gtk4 \
+        mingw-w64-ucrt-x86_64-gtksourceview5 \
+        mingw-w64-ucrt-x86_64-pkgconf \
+        mingw-w64-ucrt-x86_64-gcc
+
+# Some MSYS2 packages and pkg-config files expect the usual /ucrt64 prefix.
+RUN ln -nfs /opt/quasi-msys2/root/ucrt64 /ucrt64
+
+# Register the Windows Rust target
+RUN cd /opt/quasi-msys2 && \
+    bash -c "source env/vars.src && rustup target add \$CARGO_BUILD_TARGET"
+
+WORKDIR /build
+
+RUN cat > /usr/local/bin/build-windows << 'SH'
+#!/bin/bash
+set -e
+
+cd /opt/quasi-msys2
+source env/vars.src
+cd /build
+cargo build --release
+mkdir -p /tmp/output
+cp target/${CARGO_BUILD_TARGET}/release/IDE_C--.exe /tmp/output/
+cp src/styles.css /tmp/output/
+cp -r src/resources /tmp/output/
+cd /tmp/output
+zip -r /build/IDE_C--_windows.zip .
+echo "Done: IDE_C--_windows.zip"
+SH
+
+RUN chmod +x /usr/local/bin/build-windows
+
+CMD ["/usr/local/bin/build-windows"]

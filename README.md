@@ -112,22 +112,44 @@ The binary will be at `target/release/IDE_C--`.
 
 ### Linux Build (Alpine)
 
-Build the project inside a lightweight Alpine container:
+Build the project inside an Alpine container:
 
 ```sh
 docker build -t ide-cmm-linux .
 ```
 
-### Windows Cross-Compile
-
-Cross-compile for Windows using the [gtk4-cross](https://github.com/MGlolenstine/gtk4-cross) image:
+To export the compiled Linux binary from the image to your host:
 
 ```sh
-docker build -f Dockerfile.cross -t ide-cmm-cross .
-docker run -v $(pwd):/mnt ide-cmm-cross
+container_id=$(docker create ide-cmm-linux)
+docker cp "$container_id":/usr/local/bin/IDE_C-- ./IDE_C--
+docker rm "$container_id"
+chmod +x ./IDE_C--
 ```
 
-This generates `IDE_C--_windows.zip` in your project directory with the `.exe` and all required DLLs.
+This produces a Linux executable named `IDE_C--` in the project directory. Run it on the host with:
+
+```sh
+./IDE_C--
+```
+
+The host system still needs the GTK4 and GtkSourceView5 runtime libraries installed.
+
+### Windows Cross-Compilation
+
+This project includes two Docker-based Windows cross-compilation options:
+
+```sh
+docker build -f Dockerfile.msys2 -t ide-cmm-msys2 .
+docker run --rm -v "$(pwd)":/build ide-cmm-msys2
+```
+
+```sh
+docker build -f Dockerfile.mingw -t ide-cmm-mingw .
+docker run --rm -v "$(pwd)":/build ide-cmm-mingw
+```
+
+The MSYS2 image uses [quasi-msys2](https://github.com/HolyBlackCat/quasi-msys2) packages, and the MinGW image uses Fedora's MinGW toolchain. Both generate `IDE_C--_windows.zip` in the project directory with the Windows executable and required runtime files.
 
 ---
 

@@ -65,7 +65,8 @@ pub fn open_file_dialog(
 }
 
 pub fn save_file(window: &ApplicationWindow, buffer: gtk::TextBuffer, current_file: FileState) {
-    if let Some(path) = current_file.borrow().clone() {
+    let path_opt = current_file.borrow().clone();
+    if let Some(path) = path_opt {
         if let Err(e) = write_to_file(&path, &buffer) {
             eprintln!("Failed to save file: {}", e);
         } else {
