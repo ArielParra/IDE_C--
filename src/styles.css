@@ -1,24 +1,28 @@
-.red{
+.red {
     background-color: red;
 }
-.blue{
+
+.blue {
     background-color: blue;
 }
-.green{
+
+.green {
     background-color: green;
 }
-.yellow{
+
+.yellow {
     background-color: yellow;
 }
 
-.margin{
+.margin {
     margin: 10px;
 }
 
-.nopadding{
+.nopadding {
     padding: 0;
     margin: 0;
 }
+
 
 /* Override broken theme slider metrics with safe positive dimensions. */
 scrollbar {
@@ -35,7 +39,7 @@ scrollbar slider {
     border-width: 0;
 }
 
-paned > separator {
+paned>separator {
     min-width: 6px;
     min-height: 6px;
 }
@@ -55,7 +59,8 @@ scrollbar slider {
     border-width: 0;
 }
 
-paned > separator {
-    min-width: 6px;
-    min-height: 6px;
+/* Monospace font for tree-line box-drawing characters */
+.monospace {
+    font-family: monospace;
+    font-size: 0.9em;
 }

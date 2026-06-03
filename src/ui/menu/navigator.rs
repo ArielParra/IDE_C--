@@ -129,66 +129,34 @@ impl AstNavigator {
         editor_buffer: &gtk::TextBuffer,
         editor_view: &SourceView,
     ) {
-        let ast_view_clone = ast_view.clone();
         let editor_buffer_clone = editor_buffer.clone();
         let editor_view_clone = editor_view.clone();
 
-        let ast_borrow = ast_view_clone.borrow();
-        let tree_view = ast_borrow.tree_view.upcast_ref::<gtk::glib::Object>().clone();
+        let ast_borrow = ast_view.borrow();
+        let list_view = ast_borrow.list_view.clone();
 
-        tree_view.connect_local("row-activated", false, move |args| {
-            let tv = args[0].get::<gtk::glib::Object>().unwrap();
-            let path = args[1].get::<gtk::TreePath>().unwrap();
-
-            let model = tv.property::<Option<gtk::glib::Object>>("model");
-            if let Some(model) = model {
-                unsafe {
-                    use gtk::ffi as gtk_ffi;
-                    use std::mem::MaybeUninit;
-
-                    let model_ptr = model.as_ptr() as *mut gtk_ffi::GtkTreeModel;
-                    let mut iter = MaybeUninit::<gtk_ffi::GtkTreeIter>::uninit();
-                    let has_iter = gtk_ffi::gtk_tree_model_get_iter(
-                        model_ptr,
-                        iter.as_mut_ptr(),
-                        gtk::glib::translate::ToGlibPtr::<*mut gtk::ffi::GtkTreePath>::to_glib_none(&path).0,
-                    );
-
-                    if has_iter != gtk::glib::ffi::GFALSE {
-                        let mut iter = iter.assume_init();
-
-                        let mut line_val = std::mem::MaybeUninit::<gtk::glib::gobject_ffi::GValue>::zeroed();
-                        gtk_ffi::gtk_tree_model_get_value(
-                            model_ptr,
-                            &mut iter,
-                            2,
-                            line_val.as_mut_ptr(),
-                        );
-                        let line = gtk::glib::gobject_ffi::g_value_get_uint(line_val.as_mut_ptr());
-                        gtk::glib::gobject_ffi::g_value_unset(line_val.as_mut_ptr());
-
-                        let mut col_val = std::mem::MaybeUninit::<gtk::glib::gobject_ffi::GValue>::zeroed();
-                        gtk_ffi::gtk_tree_model_get_value(
-                            model_ptr,
-                            &mut iter,
-                            3,
-                            col_val.as_mut_ptr(),
-                        );
-                        let col = gtk::glib::gobject_ffi::g_value_get_uint(col_val.as_mut_ptr());
-                        gtk::glib::gobject_ffi::g_value_unset(col_val.as_mut_ptr());
-
-                        if line > 0 && col > 0 {
-                            ErrorNavigator::navigate_to(
-                                &editor_view_clone,
-                                &editor_buffer_clone,
-                                line as usize,
-                                col as usize,
-                            );
+        list_view.connect_activate(move |lv, pos| {
+            if let Some(model) = lv.model() {
+                if let Some(item) = model.item(pos) {
+                    if let Ok(tree_row) = item.downcast::<gtk::TreeListRow>() {
+                        if let Some(inner_item) = tree_row.item() {
+                            if let Ok(node_obj) = inner_item.downcast::<crate::ui::panels::ast_view::AstNodeObject>() {
+                                let line = node_obj.line();
+                                let col = node_obj.column();
+                                
+                                if line > 0 && col > 0 {
+                                    ErrorNavigator::navigate_to(
+                                        &editor_view_clone,
+                                        &editor_buffer_clone,
+                                        line as usize,
+                                        col as usize,
+                                    );
+                                }
+                            }
                         }
                     }
                 }
             }
-            None
         });
     }
 }

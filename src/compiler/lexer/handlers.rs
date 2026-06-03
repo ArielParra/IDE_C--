@@ -138,40 +138,40 @@ impl LexerHandlers {
         true
     }
 
-    #[allow(dead_code)]
-    pub fn handle_block_comment_start(
-        c: char,
-        chars: &[char],
-        line: usize,
-        column: usize,
-        i: &mut usize,
-        line_out: &mut usize,
-        column_out: &mut usize,
-    ) -> Option<Result<(), LexicalError>> {
-        if c != '/' || *i + 1 >= chars.len() || chars[*i + 1] != '*' {
-            return None;
-        }
-        let start_line = line;
-        let start_col = column;
-        *i += 2;
-        *column_out += 2;
-        while *i + 1 < chars.len() && !(chars[*i] == '*' && chars[*i + 1] == '/') {
-            if chars[*i] == '\n' {
-                *line_out += 1;
-                *column_out = 1;
-            } else {
-                *column_out += 1;
-            }
-            *i += 1;
-        }
-        if *i + 1 >= chars.len() {
-            *i += 1;
-            return Some(Err(LexicalError::unclosed_block_comment(start_line, start_col)));
-        }
-        *i += 2;
-        *column_out += 2;
-        Some(Ok(()))
-    }
+    // #[allow(dead_code)]
+    // pub fn handle_block_comment_start(
+    //     c: char,
+    //     chars: &[char],
+    //     line: usize,
+    //     column: usize,
+    //     i: &mut usize,
+    //     line_out: &mut usize,
+    //     column_out: &mut usize,
+    // ) -> Option<Result<(), LexicalError>> {
+    //     if c != '/' || *i + 1 >= chars.len() || chars[*i + 1] != '*' {
+    //         return None;
+    //     }
+    //     let start_line = line;
+    //     let start_col = column;
+    //     *i += 2;
+    //     *column_out += 2;
+    //     while *i + 1 < chars.len() && !(chars[*i] == '*' && chars[*i + 1] == '/') {
+    //         if chars[*i] == '\n' {
+    //             *line_out += 1;
+    //             *column_out = 1;
+    //         } else {
+    //             *column_out += 1;
+    //         }
+    //         *i += 1;
+    //     }
+    //     if *i + 1 >= chars.len() {
+    //         *i += 1;
+    //         return Some(Err(LexicalError::unclosed_block_comment(start_line, start_col)));
+    //     }
+    //     *i += 2;
+    //     *column_out += 2;
+    //     Some(Ok(()))
+    // }
   pub fn consume_block_comment(
         chars: &[char],
         i: &mut usize,
