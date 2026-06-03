@@ -15,6 +15,7 @@ statement → selection
           | expression_statement
 
 selection → if expression then statement_list [ else statement_list ] end [ ; ]
+          | if expression { statement_list } [ else { statement_list } ] [ ; ]
 
 iteration → while expression { statement_list } [ ; ]
           | while expression statement_list end [ ; ]

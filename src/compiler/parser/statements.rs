@@ -92,37 +92,75 @@ impl Parser<'_> {
         node.add_child(AstNode::new("if").with_pos(line_val, col_val));
         node.add_child(self.parse_expression());
 
-        if !self.match_type("THEN") {
+        let has_brace = self.match_lexeme("SYM", "{");
+
+        if !has_brace && !self.match_type("THEN") {
             let (line, column) = self.location_or_zero();
-            self.errors.push(SyntaxError::new("Expected 'then' after condition", line, column));
+            self.errors.push(SyntaxError::new("Expected '{' or 'then' after condition", line, column));
         }
 
         let mut then_block = AstNode::new("ThenBlock");
-        while !self.at_end() && !self.check_type("ELSE") && !self.check_type("END") {
-            if self.can_start_statement() {
-                then_block.add_child(self.parse_statement());
-            } else {
-                break;
+        if has_brace {
+            while !self.at_end() && !self.check_lexeme("SYM", "}") {
+                if self.can_start_statement() {
+                    then_block.add_child(self.parse_statement());
+                } else {
+                    break;
+                }
+            }
+            if !self.match_lexeme("SYM", "}") {
+                let (line, column) = self.location_or_zero();
+                self.errors.push(SyntaxError::new("Expected '}' after if body", line, column));
+                self.synchronize();
+            }
+        } else {
+            while !self.at_end() && !self.check_type("ELSE") && !self.check_type("END") {
+                if self.can_start_statement() {
+                    then_block.add_child(self.parse_statement());
+                } else {
+                    break;
+                }
             }
         }
         node.add_child(then_block);
 
         if self.match_type("ELSE") {
             let mut else_block = AstNode::new("ElseBlock");
-            while !self.at_end() && !self.check_type("END") {
-                if self.can_start_statement() {
-                    else_block.add_child(self.parse_statement());
-                } else {
-                    break;
+            if has_brace {
+                if !self.match_lexeme("SYM", "{") {
+                    let (line, column) = self.location_or_zero();
+                    self.errors.push(SyntaxError::new("Expected '{' after else", line, column));
+                }
+                while !self.at_end() && !self.check_lexeme("SYM", "}") {
+                    if self.can_start_statement() {
+                        else_block.add_child(self.parse_statement());
+                    } else {
+                        break;
+                    }
+                }
+                if !self.match_lexeme("SYM", "}") {
+                    let (line, column) = self.location_or_zero();
+                    self.errors.push(SyntaxError::new("Expected '}' after else body", line, column));
+                    self.synchronize();
+                }
+            } else {
+                while !self.at_end() && !self.check_type("END") {
+                    if self.can_start_statement() {
+                        else_block.add_child(self.parse_statement());
+                    } else {
+                        break;
+                    }
                 }
             }
             node.add_child(else_block);
         }
 
-        if !self.match_type("END") {
-            let (line, column) = self.location_or_zero();
-            self.errors.push(SyntaxError::new("Expected 'end' after selection", line, column));
-            self.synchronize();
+        if !has_brace {
+            if !self.match_type("END") {
+                let (line, column) = self.location_or_zero();
+                self.errors.push(SyntaxError::new("Expected 'end' after selection", line, column));
+                self.synchronize();
+            }
         }
         if self.match_lexeme("SYM", ";") {}
         node
