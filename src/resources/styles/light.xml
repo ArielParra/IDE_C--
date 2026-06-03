@@ -47,4 +47,15 @@
   <style name="def:string"
          foreground="#a31515"/>
 
+  <!-- selections and highlights -->
+  <style name="selection"
+         background="#add6ff"
+         foreground="#000000"/>
+         
+  <style name="current-line"
+         background="#f5f5f5"/>
+
+  <style name="search-match"
+         background="#eaebef"/>
+
 </style-scheme>

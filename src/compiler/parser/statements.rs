@@ -65,9 +65,14 @@ impl Parser<'_> {
     }
 
     fn parse_sent_expression(&mut self) -> AstNode {
-        let mut node = AstNode::new("ExpressionStatement");
+        let (line, col) = if let Some(prev) = self.previous() {
+            (prev.line, prev.column)
+        } else {
+            (0, 0)
+        };
+        let mut node = AstNode::new("ExpressionStatement").with_pos(line, col);
         if self.match_lexeme("SYM", ";") {
-            node.add_child(AstNode::new("empty"));
+            node.add_child(AstNode::new("empty").with_pos(line, col));
             return node;
         }
 

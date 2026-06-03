@@ -64,3 +64,8 @@ scrollbar slider {
     font-family: monospace;
     font-size: 0.9em;
 }
+
+textview selection {
+    background-color: rgba(60, 120, 200, 0.4);
+    color: inherit;
+}
