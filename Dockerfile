@@ -30,6 +30,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY --from=builder /build/target/release/IDE_C-- /usr/local/bin/IDE_C--
 COPY --from=builder /build/src/resources /usr/local/share/IDE_C--/src/resources
+COPY --from=builder /build/src/resources/icons/hicolor /usr/share/icons/hicolor
+COPY --from=builder /build/src/resources/com.ide_cmm.ide.desktop /usr/share/applications/com.ide_cmm.ide.desktop
+
+RUN gtk-update-icon-cache -f /usr/share/icons/hicolor || true
 
 WORKDIR /usr/local/share/IDE_C--
 

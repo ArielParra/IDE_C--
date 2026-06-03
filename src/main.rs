@@ -96,6 +96,6 @@ fn setup_icons() {
     if let Some(display) = Display::default() {
         let icon_theme = IconTheme::for_display(&display);
         icon_theme.add_resource_path("/com/ide_cmm/ide");
-        gtk::Window::set_default_icon_name("C--_Logo");
+        gtk::Window::set_default_icon_name("com.ide_cmm.ide");
     }
 }

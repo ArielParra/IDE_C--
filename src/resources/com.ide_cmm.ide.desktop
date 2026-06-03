@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=IDE C--
+Comment=C-- IDE
+Exec=/usr/local/bin/IDE_C--
+Icon=com.ide_cmm.ide
+Terminal=false
+Categories=Development;IDE;
+StartupNotify=true
