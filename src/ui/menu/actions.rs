@@ -35,10 +35,11 @@ impl ActionHandlers {
             lex_view.clone(),
             errors_view.clone(),
             syntax_errors_view.clone(),
+            ast_view.clone(),
         );
-        Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view, debug_notebook.clone(), errors_notebook.clone());
-        Self::register_compile_action(app, file_state);
-        Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view, debug_notebook, errors_notebook);
+        Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view, debug_notebook.clone(), errors_notebook.clone(), file_state.clone());
+        Self::register_compile_action(app, file_state.clone());
+        Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view, debug_notebook, errors_notebook, file_state);
     }
 
     fn register_file_actions(
@@ -49,6 +50,7 @@ impl ActionHandlers {
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
         syntax_errors_view: Rc<RefCell<TextView>>,
+        ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     ) {
         let buffer_clone = buffer.clone();
         let new_action = gio::SimpleAction::new("new", None);
@@ -56,6 +58,7 @@ impl ActionHandlers {
         let lex_view_clone = lex_view.clone();
         let errors_view_clone = errors_view.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
+        let ast_view_clone = ast_view.clone();
         new_action.connect_activate(move |_, _| {
             file_manager::file_ops::new_file(
                 &buffer_clone,
@@ -63,6 +66,7 @@ impl ActionHandlers {
                 lex_view_clone.clone(),
                 errors_view_clone.clone(),
                 syntax_errors_view_clone.clone(),
+                ast_view_clone.clone(),
             );
         });
         app.add_action(&new_action);
@@ -74,6 +78,7 @@ impl ActionHandlers {
         let lex_view_clone = lex_view.clone();
         let errors_view_clone = errors_view.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
+        let ast_view_clone2 = ast_view.clone();
         open_action.connect_activate(move |_, _| {
             file_manager::file_ops::open_file_dialog(
                 &window_clone,
@@ -82,6 +87,7 @@ impl ActionHandlers {
                 lex_view_clone.clone(),
                 errors_view_clone.clone(),
                 syntax_errors_view_clone.clone(),
+                ast_view_clone2.clone(),
             );
         });
         app.add_action(&open_action);
@@ -133,19 +139,37 @@ impl ActionHandlers {
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
         debug_notebook: gtk::Notebook,
-        _errors_notebook: gtk::Notebook,
+        errors_notebook: gtk::Notebook,
+        file_state: Rc<RefCell<Option<PathBuf>>>,
     ) {
         let lexical_action = gio::SimpleAction::new("lexical", None);
         let buffer_clone = buffer.clone();
         let lex_view_clone = lex_view.clone();
         let err_view_clone = errors_view.clone();
+        let file_state_clone = file_state.clone();
 
         lexical_action.connect_activate(move |_, _| {
-            debug_notebook.set_current_page(Some(1));
+            debug_notebook.set_current_page(Some(0));
+            errors_notebook.set_current_page(Some(0));
 
             let text =
                 buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
             let (tokens, errors) = compiler::analyze(&text);
+
+            // Save tokens to file for the syntax analyzer
+            let tokens_path = match &*file_state_clone.borrow() {
+                Some(p) => {
+                    let mut p = p.clone();
+                    let file_name = p.file_name().unwrap().to_string_lossy().into_owned();
+                    p.set_file_name(format!("{}.tokens", file_name));
+                    p
+                }
+                None => std::path::PathBuf::from("untitled.c--.tokens"),
+            };
+
+            if let Err(e) = crate::compiler::parser::write_tokens_to_file(&tokens, &tokens_path) {
+                eprintln!("Failed to write tokens file: {}", e);
+            }
 
             let lex_buffer = lex_view_clone.borrow().buffer();
             lex_buffer.set_text("");
@@ -193,20 +217,24 @@ impl ActionHandlers {
                 ],
             );
 
-            for e in &errors {
-                let mut message_iter = err_buffer.end_iter();
-                err_buffer.insert(&mut message_iter, &format!("{} ", e.message));
+            if errors.is_empty() {
+                err_buffer.set_text("No lexical errors detected.");
+            } else {
+                for e in &errors {
+                    let mut message_iter = err_buffer.end_iter();
+                    err_buffer.insert(&mut message_iter, &format!("{} ", e.message));
 
-                let mut link_iter = err_buffer.end_iter();
-                let link_text = format!("({}:{})", e.line, e.column);
-                if let Some(ref tag) = error_link_tag {
-                    err_buffer.insert_with_tags(&mut link_iter, &link_text, &[tag]);
-                } else {
-                    err_buffer.insert(&mut link_iter, &link_text);
+                    let mut link_iter = err_buffer.end_iter();
+                    let link_text = format!("({}:{})", e.line, e.column);
+                    if let Some(ref tag) = error_link_tag {
+                        err_buffer.insert_with_tags(&mut link_iter, &link_text, &[tag]);
+                    } else {
+                        err_buffer.insert(&mut link_iter, &link_text);
+                    }
+
+                    let mut newline_iter = err_buffer.end_iter();
+                    err_buffer.insert(&mut newline_iter, "\n");
                 }
-
-                let mut newline_iter = err_buffer.end_iter();
-                err_buffer.insert(&mut newline_iter, "\n");
             }
         });
 
@@ -219,22 +247,35 @@ impl ActionHandlers {
         syntax_errors_view: Rc<RefCell<TextView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         debug_notebook: gtk::Notebook,
-        _errors_notebook: gtk::Notebook,
+        errors_notebook: gtk::Notebook,
+        file_state: Rc<RefCell<Option<PathBuf>>>,
     ) {
         let syntax_action = gio::SimpleAction::new("syntax", None);
-        let buffer_clone = buffer.clone();
+        let _buffer_clone = buffer.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
         let ast_view_clone = ast_view.clone();
+        let file_state_clone = file_state.clone();
 
         syntax_action.connect_activate(move |_, _| {
             debug_notebook.set_current_page(Some(1));
+            errors_notebook.set_current_page(Some(1));
 
-            let text = buffer_clone.text(&buffer_clone.start_iter(), &buffer_clone.end_iter(), true);
-            let (_tokens, lexical_errors) = crate::compiler::lexer::analyze(&text);
             let err_buffer = syntax_errors_view_clone.borrow().buffer();
             err_buffer.set_text("");
 
-            if !lexical_errors.is_empty() {
+            // Read tokens from the file generated by lexical analysis
+            let tokens_path = match &*file_state_clone.borrow() {
+                Some(p) => {
+                    let mut p = p.clone();
+                    let file_name = p.file_name().unwrap().to_string_lossy().into_owned();
+                    p.set_file_name(format!("{}.tokens", file_name));
+                    p
+                }
+                None => std::path::PathBuf::from("untitled.c--.tokens"),
+            };
+            let tokens = crate::compiler::parser::read_tokens_from_file(&tokens_path);
+
+            if tokens.is_empty() {
                 let error_tag = err_buffer.create_tag(
                     None,
                     &[
@@ -243,7 +284,7 @@ impl ActionHandlers {
                     ],
                 );
                 let mut iter = err_buffer.end_iter();
-                let message = "⚠ Error: Lexical errors found. Please run Lexical Analysis first.";
+                let message = "⚠ Error: No tokens found. Please run Lexical Analysis first.";
                 if let Some(ref tag) = error_tag {
                     err_buffer.insert_with_tags(&mut iter, message, &[tag]);
                 } else {
@@ -252,7 +293,7 @@ impl ActionHandlers {
                 return;
             }
 
-            let (ast, syntax_errors) = crate::compiler::build_ast_with_errors(&text);
+            let (ast, syntax_errors) = crate::compiler::parser::build_ast_from_tokens(&tokens);
             ast_view_clone.borrow().populate(&ast);
 
             let error_link_tag = err_buffer.create_tag(

@@ -31,26 +31,6 @@ impl Parser<'_> {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn parse_statement_list(&mut self) -> AstNode {
-        let mut node = AstNode::new("StatementList");
-        while !self.at_end()
-            && !self.check_lexeme("SYM", "}")
-            && !self.check_type("END")
-            && !self.check_type("ELSE")
-            && !self.check_type("WHILE")
-            && !self.check_type("DO")
-            && !self.check_type("THEN")
-        {
-            if self.can_start_statement() {
-                node.add_child(self.parse_statement());
-            } else {
-                break;
-            }
-        }
-        node
-    }
-
     fn parse_id_statement(&mut self) -> AstNode {
         let id_name = self.current().unwrap().lexeme.clone();
         let (id_line, id_col) = (self.current().unwrap().line, self.current().unwrap().column);

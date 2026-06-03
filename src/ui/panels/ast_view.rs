@@ -47,6 +47,11 @@ impl AstView {
     }
 
     #[allow(deprecated)]
+    pub fn clear(&self) {
+        self.store.clear();
+    }
+
+    #[allow(deprecated)]
     pub fn populate(&self, root: &AstNode) {
         self.store.clear();
         self.insert_node(None, root);
@@ -149,15 +154,5 @@ impl AstView {
                 "#000000".to_string()
             }
         }
-    }
-
-    #[allow(dead_code, deprecated)]
-    pub fn expand_all(&self) {
-        self.tree_view.expand_all();
-    }
-
-    #[allow(dead_code, deprecated)]
-    pub fn collapse_all(&self) {
-        self.tree_view.collapse_all();
     }
 }

@@ -72,21 +72,6 @@ impl<'a> Parser<'a> {
         }
     }
 
-    #[allow(dead_code)]
-    pub(crate) fn consume(&mut self, token_type: &str, message: &str) -> Option<&Token> {
-        if self.check_type(token_type) {
-            return self.advance();
-        }
-
-        let (line, column, found) = if let Some(token) = self.current() {
-            (token.line, token.column, token.lexeme.clone())
-        } else {
-            (0, 0, "EOF".to_string())
-        };
-        self.errors.push(SyntaxError::expected_token(message, &found, line, column));
-        None
-    }
-
     pub(crate) fn synchronize(&mut self) {
         while !self.at_end() {
             if let Some(token) = self.previous() {

@@ -50,13 +50,4 @@ impl SyntaxError {
             column,
         }
     }
-
-    #[allow(dead_code)]
-    pub fn expected_token(expected: &str, found: &str, line: usize, column: usize) -> Self {
-        SyntaxError::new(
-            &format!("Expected {}, found '{}'", expected, found),
-            line,
-            column,
-        )
-    }
 }
