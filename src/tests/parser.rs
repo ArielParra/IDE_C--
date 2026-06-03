@@ -31,3 +31,53 @@ fn test_syntax_errors() {
     let (_, syn_errors) = build_ast_from_tokens(&tokens);
     assert!(!syn_errors.is_empty(), "Expected syntax error due to missing semicolon");
 }
+
+#[test]
+fn test_real_declaration_alias() {
+    let code = "main { real x; }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (_, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+}
+
+#[test]
+fn test_do_until_repetition_alias() {
+    let code = "main { int x; do x = x + 1; until x > 3; }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (_, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+}
+
+#[test]
+fn test_while_with_braces() {
+    let code = "main { int x; while (x < 10) { x = x + 1; } }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (_, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+}
+
+#[test]
+fn test_do_while_with_braces() {
+    let code = "main { int x; do { x = x + 1; } while (x < 10); }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (_, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+}
+
+#[test]
+fn test_do_until_with_braces() {
+    let code = "main { int x; do { x = x + 1; } until (x >= 10); }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (_, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+}

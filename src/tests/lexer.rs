@@ -48,3 +48,13 @@ fn test_lexical_errors() {
     assert_eq!(errors.len(), 2, "Expected an invalid character error and an unclosed comment error");
     assert_eq!(tokens.len(), 4);
 }
+
+#[test]
+fn test_real_and_until_alias_tokens() {
+    let code = "real x; do x = x + 1; until x > 3;";
+    let (tokens, errors) = analyze(code);
+    assert!(errors.is_empty(), "Expected no errors: {:?}", errors);
+
+    assert!(tokens.iter().any(|token| token.token_type == "FLOAT_T" && token.lexeme == "real"));
+    assert!(tokens.iter().any(|token| token.token_type == "UNTIL" && token.lexeme == "until"));
+}

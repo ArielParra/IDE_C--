@@ -6,9 +6,11 @@
 #   docker build -f Dockerfile.msys2 -t ide-cmm-msys2 .
 #   docker run --rm -v "$(pwd)":/build ide-cmm-msys2
 #
-# Output: IDE_C--_windows.zip in your working directory
+# Output: IDE_C--_windows_msys2.zip in your working directory
 # =============================================
-FROM debian:bookworm-slim
+FROM debian:trixie-slim
+
+ENV TERM=xterm
 
 # quasi-msys2 deps plus a native compiler and MinGW binutils. Without native
 # Clang/LLD or Wine, quasi-msys2 falls back to MSYS2 GCC, which cannot run in
@@ -56,8 +58,8 @@ cp target/${CARGO_BUILD_TARGET}/release/IDE_C--.exe /tmp/output/
 cp src/styles.css /tmp/output/
 cp -r src/resources /tmp/output/
 cd /tmp/output
-zip -r /build/IDE_C--_windows.zip .
-echo "Done: IDE_C--_windows.zip"
+zip -r /build/IDE_C--_windows_msys2.zip .
+echo "Done: IDE_C--_windows_msys2.zip"
 SH
 
 RUN chmod +x /usr/local/bin/build-windows

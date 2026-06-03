@@ -31,6 +31,7 @@ impl MenuBuilder {
         let menu = gio::Menu::new();
         menu.append(Some("_Undo"), Some("app.undo"));
         menu.append(Some("_Redo"), Some("app.redo"));
+        menu.append(Some("_Find"), Some("app.find"));
         menu.append(Some("Cu_t"), Some("app.cut"));
         menu.append(Some("_Copy"), Some("app.copy"));
         self.model.append_submenu(Some("_Edit"), &menu);

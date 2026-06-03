@@ -15,6 +15,7 @@ impl IDEHeaderBar {
             ("document-close-symbolic", "app.close", "Close (Ctrl+W)", "<Primary>w"),
             ("document-save-symbolic", "app.save", "Save (Ctrl+S)", "<Primary>s"),
             ("document-save-as-symbolic", "app.save_as", "Save As (Ctrl+Shift+S)", "<Primary><Shift>s"),
+            ("edit-find-symbolic", "app.find", "Find (Ctrl+F)", "<Primary>f"),
             ("application-exit-symbolic", "app.exit", "Exit (Ctrl+Q)", "<Primary>q"),
             ("system-run-symbolic", "app.c--compiler", "Execute (Ctrl+R)", "<Primary>r"),
         ];

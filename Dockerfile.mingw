@@ -7,7 +7,7 @@
 #   docker build -f Dockerfile.mingw -t ide-cmm-mingw .
 #   docker run --rm -v "$(pwd)":/build ide-cmm-mingw
 #
-# Output: IDE_C--_windows.zip in your working directory
+# Output: IDE_C--_windows_mingw.zip in your working directory
 # =============================================
 FROM fedora:latest
 
@@ -80,8 +80,8 @@ cp src/styles.css /tmp/output/
 cp -r src/resources /tmp/output/
 cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/*.dll /tmp/output/
 cd /tmp/output
-zip -r /build/IDE_C--_windows.zip .
-echo "Done: IDE_C--_windows.zip"
+zip -r /build/IDE_C--_windows_mingw.zip .
+echo "Done: IDE_C--_windows_mingw.zip"
 SH
 
 RUN chmod +x /usr/local/bin/build-windows

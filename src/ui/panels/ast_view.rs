@@ -255,7 +255,7 @@ impl AstView {
             bool_val.to_string()
         } else if label.starts_with("type:") {
             type_color.to_string()
-        } else if label == "main" || label == "if" || label == "while" || label == "do" {
+        } else if label == "main" || label == "if" || label == "while" || label == "do" || label == "until" {
             statement.to_string()
         } else if label.contains("Expression")
             || label.contains("Selection")

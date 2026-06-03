@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, TextView};
+use gtk::{Application, ApplicationWindow, TextView, SearchBar, SearchEntry};
 use sourceview5::View as SourceView;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -21,6 +21,8 @@ pub fn build_menu(
     ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     debug_notebook: gtk::Notebook,
     errors_notebook: gtk::Notebook,
+    search_bar: SearchBar,
+    search_entry: SearchEntry,
 ) -> gtk::gio::Menu {
     let editor_buffer: gtk::TextBuffer = buffer.as_ref().clone();
 
@@ -33,6 +35,7 @@ pub fn build_menu(
         app,
         window,
         buffer,
+        editor_view.clone(),
         file_state,
         lex_view,
         errors_view,
@@ -40,6 +43,8 @@ pub fn build_menu(
         ast_view,
         debug_notebook,
         errors_notebook,
+        search_bar,
+        search_entry,
     );
 
     MenuBuilder::new()

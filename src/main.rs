@@ -32,6 +32,7 @@ fn main() {
         // Edit menu shortcuts
         app.set_accels_for_action("app.undo", &["<Primary>z"]);
         app.set_accels_for_action("app.redo", &["<Primary>y", "<Primary><Shift>z"]);
+        app.set_accels_for_action("app.find", &["<Primary>f"]);
         app.set_accels_for_action("app.cut", &["<Primary>x"]);
         app.set_accels_for_action("app.copy", &["<Primary>c"]);
     });

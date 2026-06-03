@@ -1,14 +1,17 @@
 # =============================================
-# Stage 1: Build on Alpine Linux
+# Stage 1: Build a glibc Linux binary
 # =============================================
-FROM alpine:edge AS builder
+FROM debian:trixie-slim AS builder
 
-RUN apk add --no-cache \
-    rust cargo \
-    build-base pkgconf \
-    gtk4.0-dev gtksourceview5-dev glib-dev \
-    gobject-introspection-dev cairo-dev pango-dev gdk-pixbuf-dev \
-    gcompat libc6-compat
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config curl ca-certificates \
+    libgtk-4-dev libgtksourceview-5-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:$PATH"
+ENV PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
 
 WORKDIR /build
 COPY . .
@@ -16,16 +19,14 @@ COPY . .
 RUN cargo build --release
 
 # =============================================
-# Stage 2: Minimal runtime image
+# Stage 2: Small glibc runtime/export image
 # =============================================
-FROM alpine:edge
+FROM debian:trixie-slim
 
-RUN apk add --no-cache \
-    rust cargo build-base pkgconf \
-    gtk4.0-dev gtksourceview5-dev glib-dev \
-    gobject-introspection-dev cairo-dev pango-dev gdk-pixbuf-dev \
-    gcompat libc6-compat \
-    adwaita-icon-theme font-noto
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgtk-4-1 libgtksourceview-5-0 \
+    adwaita-icon-theme fonts-noto-core \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/target/release/IDE_C-- /usr/local/bin/IDE_C--
 COPY --from=builder /build/src/styles.css /usr/local/share/IDE_C--/src/styles.css

@@ -1,5 +1,6 @@
 use gtk::prelude::*;
-use gtk::{gio, pango::Underline, Application, ApplicationWindow, TextView};
+use gtk::{gio, pango::Underline, Application, ApplicationWindow, TextView, SearchBar, SearchEntry};
+use sourceview5::View as SourceView;
 use std::cell::RefCell;
 use std::io::BufRead;
 use std::path::PathBuf;
@@ -16,6 +17,7 @@ impl ActionHandlers {
         app: &Application,
         window: &ApplicationWindow,
         buffer: &impl IsA<gtk::TextBuffer>,
+        editor_view: SourceView,
         file_state: Rc<RefCell<Option<PathBuf>>>,
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
@@ -23,6 +25,8 @@ impl ActionHandlers {
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         debug_notebook: gtk::Notebook,
         errors_notebook: gtk::Notebook,
+        search_bar: SearchBar,
+        search_entry: SearchEntry,
     ) {
         let text_buffer: gtk::TextBuffer = buffer.as_ref().clone();
         let buffer_clone = text_buffer.clone();
@@ -37,6 +41,7 @@ impl ActionHandlers {
             syntax_errors_view.clone(),
             ast_view.clone(),
         );
+        Self::register_find_action(app, window, &buffer_clone, &editor_view, search_bar, search_entry);
         Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view, debug_notebook.clone(), errors_notebook.clone(), file_state.clone());
         Self::register_compile_action(app, file_state.clone());
         Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view, debug_notebook, errors_notebook, file_state);
@@ -131,6 +136,37 @@ impl ActionHandlers {
             app_clone.quit();
         });
         app.add_action(&exit_action);
+    }
+
+    fn register_find_action(
+        app: &Application,
+        _window: &ApplicationWindow,
+        buffer: &gtk::TextBuffer,
+        editor_view: &SourceView,
+        search_bar: SearchBar,
+        search_entry: SearchEntry,
+    ) {
+        let find_action = gio::SimpleAction::new("find", None);
+        let search_bar_clone = search_bar.clone();
+        let search_entry_clone = search_entry.clone();
+
+        find_action.connect_activate(move |_, _| {
+            search_bar_clone.set_search_mode(true);
+            search_entry_clone.grab_focus();
+        });
+
+        let buffer_for_response = buffer.clone();
+        let view_for_response = editor_view.clone();
+        let entry_for_response = search_entry.clone();
+
+        search_entry.connect_activate(move |_| {
+            let query = entry_for_response.text().to_string();
+            if !query.is_empty() {
+                find_next_in_buffer(&buffer_for_response, &view_for_response, &query);
+            }
+        });
+
+        app.add_action(&find_action);
     }
 
     fn register_lexical_action(
@@ -408,4 +444,41 @@ fn lexical_token_color(tipo: &str, lexema: &str) -> &'static str {
         }
         _ => "#ffffff",
     }
+}
+
+fn find_next_in_buffer(buffer: &gtk::TextBuffer, view: &SourceView, query: &str) {
+    let text = buffer
+        .text(&buffer.start_iter(), &buffer.end_iter(), true)
+        .to_string();
+
+    let start_offset = if let Some((_, end)) = buffer.selection_bounds() {
+        end.offset().max(0) as usize
+    } else {
+        buffer.cursor_position().max(0) as usize
+    };
+
+    let found_offset = find_char_offset(&text, query, start_offset)
+        .or_else(|| find_char_offset(&text, query, 0));
+
+    if let Some(found_offset) = found_offset {
+        let query_len = query.chars().count();
+        let mut start_iter = buffer.iter_at_offset(found_offset as i32);
+        let end_iter = buffer.iter_at_offset((found_offset + query_len) as i32);
+        buffer.select_range(&start_iter, &end_iter);
+        view.scroll_to_iter(&mut start_iter, 0.1, false, 0.0, 0.0);
+    }
+}
+
+fn find_char_offset(text: &str, query: &str, start_char: usize) -> Option<usize> {
+    let haystack: Vec<char> = text.chars().collect();
+    let needle: Vec<char> = query.chars().collect();
+
+    if needle.is_empty() || start_char >= haystack.len() {
+        return None;
+    }
+
+    haystack[start_char..]
+        .windows(needle.len())
+        .position(|window| window == needle.as_slice())
+        .map(|index| start_char + index)
 }

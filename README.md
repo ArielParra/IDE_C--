@@ -110,9 +110,9 @@ The binary will be at `target/release/IDE_C--`.
 
 ## Docker
 
-### Linux Build (Alpine)
+### Linux Build
 
-Build the project inside an Alpine container:
+Build the project inside a Debian Trixie slim container. This keeps the exported binary on glibc and provides GTK 4.10+ for the `gtk4` Rust crate:
 
 ```sh
 docker build -t ide-cmm-linux .
@@ -127,7 +127,7 @@ docker rm "$container_id"
 chmod +x ./IDE_C--
 ```
 
-This produces a Linux executable named `IDE_C--` in the project directory. Run it on the host with:
+This produces a glibc Linux executable named `IDE_C--` in the project directory. Run it on the host with:
 
 ```sh
 ./IDE_C--

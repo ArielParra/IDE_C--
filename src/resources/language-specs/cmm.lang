@@ -53,6 +53,7 @@
       <keyword>else</keyword>
       <keyword>end</keyword>
       <keyword>do</keyword>
+      <keyword>until</keyword>
       <keyword>while</keyword>
       <keyword>for</keyword>
       <keyword>real</keyword>

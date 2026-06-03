@@ -1,28 +1,63 @@
 program → main { declaration_list }
-declaration_list → declaration_list declaration | declaration
-declaration → variable_declaration | statement_list
+
+declaration_list → declaration_list declaration | ε
+declaration → variable_declaration | statement
 variable_declaration → type identifier_list ;
 identifier_list → id | identifier_list , id
-type → int | float | bool
+type → int | float | real | bool
+
+statement → selection
+          | iteration
+          | repetition
+          | input_statement
+          | output_statement
+          | assignment
+          | expression_statement
+
+selection → if expression then statement_list [ else statement_list ] end [ ; ]
+
+iteration → while expression { statement_list } [ ; ]
+          | while expression statement_list end [ ; ]
+
+repetition → do { statement_list } repetition_condition expression [ ; ]
+           | do statement_list repetition_condition expression [ ; ]
+repetition_condition → while | until
+
 statement_list → statement_list statement | ε
-statement → selection | iteration | repetition | input_statement | output_statement | assignment
+
 assignment → id = expression_statement
 expression_statement → expression ; | ;
-selection → if expression then statement_list [ else statement_list ] end
-iteration → while expression statement_list end
-repetition → do statement_list while expression
+
 input_statement → cin >> id ;
-output_statement → cout << output_chain
+output_statement → cout << output_chain [ ; ]
 output_chain → output_operand { << output_operand }
 output_operand → string | expression
-expression → simple_expression [ rel_op simple_expression ]
+
+expression → logical_or
+logical_or → logical_or || logical_and | logical_and
+logical_and → logical_and && relational | relational
+relational → simple_expression [ rel_op simple_expression ]
 rel_op → < | <= | > | >= | == | !=
+
 simple_expression → simple_expression add_op term | term
 add_op → + | - | ++ | --
+
 term → term mul_op factor | factor
 mul_op → * | / | %
+
 factor → factor power_op component | component
 power_op → ^
-component → ( expression ) | number | id | bool | logical_op component
-logical_op → && | || | !
+
+component → ( expression )
+          | number
+          | id
+          | bool
+          | string
+          | prefix_op component
+          | component postfix_op
+
+prefix_op → ++ | -- | !
+postfix_op → ++ | --
+number → int_literal | float_literal
+bool → true | false
 string → "any text"

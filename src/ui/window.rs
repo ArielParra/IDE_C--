@@ -1,5 +1,5 @@
 use gtk::prelude::*;
-use gtk::{Application, ApplicationWindow, Box, Orientation};
+use gtk::{Application, ApplicationWindow, Box, Orientation, SearchBar, SearchEntry};
 
 use super::editor::{create_editor, EditorSettings};
 use super::headerbar::IDEHeaderBar;
@@ -40,6 +40,15 @@ impl Window {
         let headerbar = IDEHeaderBar::new(app);
         let file_state = new_file_state();
 
+        let search_bar = SearchBar::builder()
+            .key_capture_widget(&window)
+            .build();
+        let search_entry = SearchEntry::builder()
+            .placeholder_text("Search text...")
+            .hexpand(true)
+            .build();
+        search_bar.set_child(Some(&search_entry));
+
         let menubar_model = build_menu(
             app,
             &window,
@@ -52,12 +61,15 @@ impl Window {
             panels.ast_view.clone(),
             panels.debug.clone(),
             panels.errors.clone(),
+            search_bar.clone(),
+            search_entry.clone(),
         );
 
         app.set_menubar(Some(&menubar_model));
         window.set_show_menubar(true);
 
         let windowbox = Box::new(Orientation::Vertical, 0);
+        windowbox.append(&search_bar);
         windowbox.append(&layout.container);
 
         window.set_titlebar(Some(&headerbar.widget));

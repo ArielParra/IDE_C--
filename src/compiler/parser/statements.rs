@@ -131,20 +131,36 @@ impl Parser<'_> {
         node.add_child(self.parse_expression());
 
         let mut body = AstNode::new("WhileBody");
-        while !self.at_end() && !self.check_type("END") {
-            if self.can_start_statement() {
-                body.add_child(self.parse_statement());
-            } else {
-                break;
+        if self.match_lexeme("SYM", "{") {
+            while !self.at_end() && !self.check_lexeme("SYM", "}") {
+                if self.can_start_statement() {
+                    body.add_child(self.parse_statement());
+                } else {
+                    break;
+                }
+            }
+
+            if !self.match_lexeme("SYM", "}") {
+                let (line, column) = self.location_or_zero();
+                self.errors.push(SyntaxError::new("Expected '}' after while body", line, column));
+                self.synchronize();
+            }
+        } else {
+            while !self.at_end() && !self.check_type("END") {
+                if self.can_start_statement() {
+                    body.add_child(self.parse_statement());
+                } else {
+                    break;
+                }
+            }
+
+            if !self.match_type("END") {
+                let (line, column) = self.location_or_zero();
+                self.errors.push(SyntaxError::new("Expected 'end' or '{...}' body after while loop", line, column));
+                self.synchronize();
             }
         }
-
         node.add_child(body);
-        if !self.match_type("END") {
-            let (line, column) = self.location_or_zero();
-            self.errors.push(SyntaxError::new("Expected 'end' after while loop", line, column));
-            self.synchronize();
-        }
         if self.match_lexeme("SYM", ";") {}
         node
     }
@@ -153,19 +169,41 @@ impl Parser<'_> {
         let (line_val, col_val) = self.location_or_zero();
         let mut node = AstNode::new("Repetition").with_pos(line_val, col_val);
         self.advance();
+        node.add_child(AstNode::new("do").with_pos(line_val, col_val));
+
         let mut body = AstNode::new("DoBody");
-        while !self.at_end() && !self.check_type("WHILE") {
-            if self.can_start_statement() {
-                body.add_child(self.parse_statement());
-            } else {
-                break;
+        if self.match_lexeme("SYM", "{") {
+            while !self.at_end() && !self.check_lexeme("SYM", "}") {
+                if self.can_start_statement() {
+                    body.add_child(self.parse_statement());
+                } else {
+                    break;
+                }
+            }
+
+            if !self.match_lexeme("SYM", "}") {
+                let (line, column) = self.location_or_zero();
+                self.errors.push(SyntaxError::new("Expected '}' after do body", line, column));
+                self.synchronize();
+            }
+        } else {
+            while !self.at_end() && !self.check_type("WHILE") && !self.check_type("UNTIL") {
+                if self.can_start_statement() {
+                    body.add_child(self.parse_statement());
+                } else {
+                    break;
+                }
             }
         }
         node.add_child(body);
 
-        if !self.match_type("WHILE") {
+        if self.check_type("WHILE") || self.check_type("UNTIL") {
+            let token = self.current().unwrap();
+            node.add_child(AstNode::new(token.lexeme.clone()).with_pos(token.line, token.column));
+            self.advance();
+        } else {
             let (line, column) = self.location_or_zero();
-            self.errors.push(SyntaxError::new("Expected 'while' after do body", line, column));
+            self.errors.push(SyntaxError::new("Expected 'while' or 'until' after do body", line, column));
         }
         node.add_child(self.parse_expression());
         

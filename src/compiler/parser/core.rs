@@ -81,7 +81,7 @@ impl<'a> Parser<'a> {
             }
 
             match self.current().map(|t| t.token_type.as_str()) {
-                Some("MAIN") | Some("IF") | Some("WHILE") | Some("DO") | Some("CIN") | Some("COUT") | Some("INT_T") | Some("FLOAT_T") | Some("BOOL_T") | Some("END") | Some("ELSE") => return,
+                Some("MAIN") | Some("IF") | Some("WHILE") | Some("DO") | Some("UNTIL") | Some("CIN") | Some("COUT") | Some("INT_T") | Some("FLOAT_T") | Some("BOOL_T") | Some("END") | Some("ELSE") => return,
                 _ => {
                     self.advance();
                 }
@@ -141,7 +141,7 @@ impl<'a> Parser<'a> {
     fn parse_declaration_list(&mut self) -> AstNode {
         let mut node = AstNode::new("DeclarationList");
         while !self.at_end() && !self.check_lexeme("SYM", "}") {
-            if self.check_type("INT_T") || self.check_type("FLOAT_T") || self.check_type("BOOL_T") {
+            if self.is_type_token() {
                 node.add_child(self.parse_variable_declaration());
             } else if self.can_start_statement() {
                 node.add_child(self.parse_statement());
@@ -196,5 +196,9 @@ impl<'a> Parser<'a> {
         }
 
         node
+    }
+
+    fn is_type_token(&self) -> bool {
+        self.check_type("INT_T") || self.check_type("FLOAT_T") || self.check_type("BOOL_T")
     }
 }
