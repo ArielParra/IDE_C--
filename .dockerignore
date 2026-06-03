@@ -1,0 +1,18 @@
+# Ignore build artifacts
+target/
+*.tokens
+
+# Ignore IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Ignore git
+.git/
+.gitignore

@@ -1,0 +1,40 @@
+# =============================================
+# Windows cross-compilation using gtk4-cross
+# Base: Fedora (only distro with mingw-gtk4)
+# =============================================
+# This uses the gtk4-cross community image which
+# has mingw-w64 + Windows GTK4 libs pre-configured.
+#
+# Usage:
+#   docker build -f Dockerfile.cross -t ide-cmm-cross .
+#   docker run -v $(pwd):/mnt ide-cmm-cross
+#
+# Output: target/x86_64-pc-windows-gnu/release/IDE_C--.exe
+# =============================================
+
+FROM ghcr.io/mglolenstine/gtk4-cross:rust-gtk-4.8 AS builder
+
+WORKDIR /mnt
+COPY . .
+
+# Build for Windows using the pre-configured cross-compilation environment
+RUN build
+
+# =============================================
+# Output: copy the .exe and required DLLs
+# =============================================
+FROM alpine:latest AS output
+
+RUN apk add --no-cache zip
+
+COPY --from=builder /mnt/target/x86_64-pc-windows-gnu/release/IDE_C--.exe /output/
+COPY --from=builder /mnt/src/styles.css /output/src/styles.css
+COPY --from=builder /mnt/src/resources /output/src/resources
+
+# Package Windows DLLs from the cross-compile sysroot
+COPY --from=builder /usr/x86_64-w64-mingw32/sys-root/mingw/bin/*.dll /output/
+
+WORKDIR /output
+RUN zip -r /IDE_C--_windows.zip .
+
+CMD ["cp", "/IDE_C--_windows.zip", "/mnt/IDE_C--_windows.zip"]
