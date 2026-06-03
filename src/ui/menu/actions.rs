@@ -43,7 +43,7 @@ impl ActionHandlers {
         );
         Self::register_find_action(app, window, &buffer_clone, &editor_view, search_bar, search_entry);
         Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view, debug_notebook.clone(), errors_notebook.clone(), file_state.clone());
-        Self::register_compile_action(app, file_state.clone());
+        Self::register_compile_action(app, window, file_state.clone());
         Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view, debug_notebook, errors_notebook, file_state);
     }
 
@@ -64,7 +64,9 @@ impl ActionHandlers {
         let errors_view_clone = errors_view.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
         let ast_view_clone = ast_view.clone();
+        let window_clone_new = window.clone();
         new_action.connect_activate(move |_, _| {
+            file_manager::file_ops::flash_action_button(&window_clone_new, "app.new");
             file_manager::file_ops::new_file(
                 &buffer_clone,
                 file_state_clone.clone(),
@@ -85,6 +87,7 @@ impl ActionHandlers {
         let syntax_errors_view_clone = syntax_errors_view.clone();
         let ast_view_clone2 = ast_view.clone();
         open_action.connect_activate(move |_, _| {
+            file_manager::file_ops::flash_action_button(&window_clone, "app.open");
             file_manager::file_ops::open_file_dialog(
                 &window_clone,
                 buffer_clone.clone(),
@@ -99,7 +102,9 @@ impl ActionHandlers {
 
         let close_action = gio::SimpleAction::new("close", None);
         let app_clone = app.clone();
+        let window_clone_close = window.clone();
         close_action.connect_activate(move |_, _| {
+            file_manager::file_ops::flash_action_button(&window_clone_close, "app.close");
             app_clone.activate_action("new", None);
         });
         app.add_action(&close_action);
@@ -122,6 +127,7 @@ impl ActionHandlers {
         let buffer_clone = buffer.clone();
         let file_state_clone = file_state.clone();
         save_as_action.connect_activate(move |_, _| {
+            file_manager::file_ops::flash_action_button(&window_clone, "app.save_as");
             file_manager::file_ops::save_as_file_dialog(
                 &window_clone,
                 buffer_clone.clone(),
@@ -140,7 +146,7 @@ impl ActionHandlers {
 
     fn register_find_action(
         app: &Application,
-        _window: &ApplicationWindow,
+        window: &ApplicationWindow,
         buffer: &gtk::TextBuffer,
         editor_view: &SourceView,
         search_bar: SearchBar,
@@ -150,7 +156,9 @@ impl ActionHandlers {
         let search_bar_clone = search_bar.clone();
         let search_entry_clone = search_entry.clone();
 
+        let window_clone_find = window.clone();
         find_action.connect_activate(move |_, _| {
+            file_manager::file_ops::flash_action_button(&window_clone_find, "app.find");
             search_bar_clone.set_search_mode(true);
             search_entry_clone.grab_focus();
         });
@@ -364,11 +372,14 @@ impl ActionHandlers {
         app.add_action(&syntax_action);
     }
 
-    fn register_compile_action(app: &Application, file_state: Rc<RefCell<Option<PathBuf>>>) {
+    fn register_compile_action(app: &Application, window: &ApplicationWindow, file_state: Rc<RefCell<Option<PathBuf>>>) {
         let compile_action = gio::SimpleAction::new("c--compiler", None);
         let file_state_clone = file_state.clone();
 
+        let window_clone_compile = window.clone();
+
         compile_action.connect_activate(move |_, _| {
+            file_manager::file_ops::flash_action_button(&window_clone_compile, "app.c--compiler");
             let path = match &*file_state_clone.borrow() {
                 Some(p) => p.clone(),
                 None => {

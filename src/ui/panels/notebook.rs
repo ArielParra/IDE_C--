@@ -49,24 +49,14 @@ fn create_debug_notebook(
         let widget: gtk::Widget = if i == 0 {
             let tv = lexic_view.borrow().clone();
             tv.set_editable(false);
-            let scrolled = ScrolledWindow::builder()
-                .child(&tv)
-                .vexpand(true)
-                .hexpand(true)
-                .build();
-            scrolled.upcast()
+            with_copy_button(&tv)
         } else if i == 1 {
             let scrolled = ast_view.borrow().widget();
             scrolled.upcast()
         } else {
             let tv = TextView::new();
             tv.set_editable(false);
-            let scrolled = ScrolledWindow::builder()
-                .child(&tv)
-                .vexpand(true)
-                .hexpand(true)
-                .build();
-            scrolled.upcast()
+            with_copy_button(&tv)
         };
 
         let label = Label::new(Some(name));
@@ -92,30 +82,15 @@ fn create_errors_notebook(
         let widget: gtk::Widget = if i == 0 {
             let tv = errors_view.borrow().clone();
             tv.set_editable(false);
-            let scrolled = ScrolledWindow::builder()
-                .child(&tv)
-                .vexpand(true)
-                .hexpand(true)
-                .build();
-            scrolled.upcast()
+            with_copy_button(&tv)
         } else if i == 1 {
             let tv = syntax_errors_view.borrow().clone();
             tv.set_editable(false);
-            let scrolled = ScrolledWindow::builder()
-                .child(&tv)
-                .vexpand(true)
-                .hexpand(true)
-                .build();
-            scrolled.upcast()
+            with_copy_button(&tv)
         } else {
             let tv = TextView::new();
             tv.set_editable(false);
-            let scrolled = ScrolledWindow::builder()
-                .child(&tv)
-                .vexpand(true)
-                .hexpand(true)
-                .build();
-            scrolled.upcast()
+            with_copy_button(&tv)
         };
 
         let label = Label::new(Some(name));
@@ -123,4 +98,39 @@ fn create_errors_notebook(
     }
 
     notebook
+}
+
+fn with_copy_button(tv: &TextView) -> gtk::Widget {
+    let overlay = gtk::Overlay::new();
+    
+    let scrolled = ScrolledWindow::builder()
+        .child(tv)
+        .vexpand(true)
+        .hexpand(true)
+        .build();
+        
+    overlay.set_child(Some(&scrolled));
+    
+    let copy_btn = gtk::Button::builder()
+        .tooltip_text("Copy Output")
+        .halign(gtk::Align::End)
+        .valign(gtk::Align::Start)
+        .margin_top(8)
+        .margin_end(24)
+        .build();
+        
+    let icon = gtk::Image::from_icon_name("edit-copy-symbolic");
+    copy_btn.set_child(Some(&icon));
+    copy_btn.add_css_class("flat");
+    
+    let tv_clone = tv.clone();
+    copy_btn.connect_clicked(move |_| {
+        let buffer = tv_clone.buffer();
+        let text = buffer.text(&buffer.start_iter(), &buffer.end_iter(), true).to_string();
+        tv_clone.clipboard().set_text(&text);
+    });
+    
+    overlay.add_overlay(&copy_btn);
+    
+    overlay.upcast()
 }

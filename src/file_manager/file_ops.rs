@@ -134,8 +134,12 @@ fn show_save_indicator(window: &ApplicationWindow) {
         gtk::glib::ControlFlow::Break
     });
 
+    flash_action_button(window, "app.save");
+}
+
+pub fn flash_action_button(window: &ApplicationWindow, action_name: &str) {
     if let Some(titlebar) = window.titlebar() {
-        if let Some(btn) = find_save_button(&titlebar) {
+        if let Some(btn) = find_action_button(&titlebar, action_name) {
             btn.set_state_flags(gtk::StateFlags::ACTIVE, false);
             let btn_clone = btn.clone();
             gtk::glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
@@ -146,10 +150,10 @@ fn show_save_indicator(window: &ApplicationWindow) {
     }
 }
 
-fn find_save_button(widget: &gtk::Widget) -> Option<gtk::Button> {
+fn find_action_button(widget: &gtk::Widget, target_action: &str) -> Option<gtk::Button> {
     if let Some(btn) = widget.downcast_ref::<gtk::Button>() {
         if let Some(action_name) = btn.action_name() {
-            if action_name == "app.save" {
+            if action_name == target_action {
                 return Some(btn.clone());
             }
         }
@@ -157,7 +161,7 @@ fn find_save_button(widget: &gtk::Widget) -> Option<gtk::Button> {
     
     let mut child = widget.first_child();
     while let Some(c) = child {
-        if let Some(btn) = find_save_button(&c) {
+        if let Some(btn) = find_action_button(&c, target_action) {
             return Some(btn);
         }
         child = c.next_sibling();
