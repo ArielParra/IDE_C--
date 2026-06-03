@@ -40,7 +40,7 @@ impl Window {
         let headerbar = IDEHeaderBar::new(app);
         let file_state = new_file_state();
 
-        let menubar = build_menu(
+        let menubar_model = build_menu(
             app,
             &window,
             &editor.buffer,
@@ -54,8 +54,10 @@ impl Window {
             panels.errors.clone(),
         );
 
+        app.set_menubar(Some(&menubar_model));
+        window.set_show_menubar(true);
+
         let windowbox = Box::new(Orientation::Vertical, 0);
-        windowbox.append(&menubar);
         windowbox.append(&layout.container);
 
         window.set_titlebar(Some(&headerbar.widget));

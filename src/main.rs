@@ -3,6 +3,9 @@ mod file_manager;
 mod models;
 mod ui;
 
+#[cfg(test)]
+mod tests;
+
 use gtk::gdk::Display;
 use gtk::gio;
 use gtk::Application;
@@ -13,9 +16,24 @@ fn main() {
         .application_id("com.ide_cmm.ide")
         .build();
 
-    app.connect_startup(|_| {
+    app.connect_startup(|app| {
         load_css();
         apply_system_theme();
+
+        // Standard IDE keyboard shortcuts
+        app.set_accels_for_action("app.new", &["<Primary>n"]);
+        app.set_accels_for_action("app.open", &["<Primary>o"]);
+        app.set_accels_for_action("app.save", &["<Primary>s"]);
+        app.set_accels_for_action("app.save_as", &["<Primary><Shift>s"]);
+        app.set_accels_for_action("app.close", &["<Primary>w"]);
+        app.set_accels_for_action("app.exit", &["<Primary>q"]);
+        app.set_accels_for_action("app.c--compiler", &["<Primary>r"]);
+        
+        // Edit menu shortcuts
+        app.set_accels_for_action("app.undo", &["<Primary>z"]);
+        app.set_accels_for_action("app.redo", &["<Primary>y", "<Primary><Shift>z"]);
+        app.set_accels_for_action("app.cut", &["<Primary>x"]);
+        app.set_accels_for_action("app.copy", &["<Primary>c"]);
     });
     app.connect_activate(|app| {
         let window = ui::Window::build(&app);

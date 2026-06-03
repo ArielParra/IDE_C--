@@ -21,7 +21,7 @@ pub fn build_menu(
     ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     debug_notebook: gtk::Notebook,
     errors_notebook: gtk::Notebook,
-) -> gtk::PopoverMenuBar {
+) -> gtk::gio::Menu {
     let editor_buffer: gtk::TextBuffer = buffer.as_ref().clone();
 
     ErrorNavigator::connect_error_click(&errors_view, &editor_buffer, &editor_view);

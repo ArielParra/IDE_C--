@@ -6,26 +6,37 @@ pub struct IDEHeaderBar {
 }
 
 impl IDEHeaderBar {
-    pub fn new(app: &Application) -> Self {
+    pub fn new(_app: &Application) -> Self {
         let header = HeaderBar::new();
 
         let buttons = [
-            ("document-new-symbolic", "new"),
-            ("document-open-symbolic", "open"),
-            ("document-close-symbolic", "close"),
-            ("document-save-symbolic", "save"),
-            ("document-save-as-symbolic", "save_as"),
-            ("application-exit-symbolic", "exit"),
-            ("system-run-symbolic", "execute"),
+            ("document-new-symbolic", "app.new", "New (Ctrl+N)", "<Primary>n"),
+            ("document-open-symbolic", "app.open", "Open (Ctrl+O)", "<Primary>o"),
+            ("document-close-symbolic", "app.close", "Close (Ctrl+W)", "<Primary>w"),
+            ("document-save-symbolic", "app.save", "Save (Ctrl+S)", "<Primary>s"),
+            ("document-save-as-symbolic", "app.save_as", "Save As (Ctrl+Shift+S)", "<Primary><Shift>s"),
+            ("application-exit-symbolic", "app.exit", "Exit (Ctrl+Q)", "<Primary>q"),
+            ("system-run-symbolic", "app.c--compiler", "Execute (Ctrl+R)", "<Primary>r"),
         ];
 
-        for (icon, action) in buttons {
-            let btn = Button::builder().icon_name(icon).build();
+        for (icon, action, tooltip, shortcut_str) in buttons {
+            let btn = Button::builder()
+                .icon_name(icon)
+                .action_name(action)
+                .tooltip_text(tooltip)
+                .build();
 
-            let app_clone = app.clone();
-            btn.connect_clicked(move |_| {
-                app_clone.activate_action(action, None);
-            });
+            // Add shortcut controller to visually activate the button
+            if let Some(trigger) = gtk::ShortcutTrigger::parse_string(shortcut_str) {
+                let shortcut = gtk::Shortcut::new(
+                    Some(trigger),
+                    Some(gtk::ShortcutAction::parse_string("activate").unwrap())
+                );
+                let controller = gtk::ShortcutController::new();
+                controller.set_scope(gtk::ShortcutScope::Global);
+                controller.add_shortcut(shortcut);
+                btn.add_controller(controller);
+            }
 
             btn.add_css_class("flat");
             header.pack_start(&btn);

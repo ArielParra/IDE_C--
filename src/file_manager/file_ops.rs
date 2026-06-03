@@ -68,6 +68,8 @@ pub fn save_file(window: &ApplicationWindow, buffer: gtk::TextBuffer, current_fi
     if let Some(path) = current_file.borrow().clone() {
         if let Err(e) = write_to_file(&path, &buffer) {
             eprintln!("Failed to save file: {}", e);
+        } else {
+            show_save_indicator(window);
         }
     } else {
         save_as_file_dialog(window, buffer, current_file);
@@ -80,6 +82,7 @@ pub fn save_as_file_dialog(
     current_file: FileState,
 ) {
     let dialog = FileDialog::builder().title("Save File").modal(true).build();
+    let window_clone = window.clone();
 
     dialog.save(
         Some(window),
@@ -91,6 +94,7 @@ pub fn save_as_file_dialog(
                         eprintln!("Failed to save file: {}", e);
                     } else {
                         *current_file.borrow_mut() = Some(path);
+                        show_save_indicator(&window_clone);
                     }
                 }
             }
@@ -109,4 +113,54 @@ fn write_to_file(path: &PathBuf, buffer: &gtk::TextBuffer) -> std::io::Result<()
     let mut file = fs::File::create(path)?;
     file.write_all(text.as_bytes())?;
     Ok(())
+}
+
+fn show_save_indicator(window: &ApplicationWindow) {
+    let original_title = window
+        .title()
+        .map(|s| s.to_string())
+        .unwrap_or_else(|| "IDE_C--".to_string());
+
+    if original_title.ends_with(" - Guardado") {
+        return;
+    }
+
+    window.set_title(Some(&format!("{} - Guardado", original_title)));
+
+    let window_clone = window.clone();
+    gtk::glib::timeout_add_local(std::time::Duration::from_millis(1500), move || {
+        window_clone.set_title(Some(&original_title));
+        gtk::glib::ControlFlow::Break
+    });
+
+    if let Some(titlebar) = window.titlebar() {
+        if let Some(btn) = find_save_button(&titlebar) {
+            btn.set_state_flags(gtk::StateFlags::ACTIVE, false);
+            let btn_clone = btn.clone();
+            gtk::glib::timeout_add_local(std::time::Duration::from_millis(200), move || {
+                btn_clone.unset_state_flags(gtk::StateFlags::ACTIVE);
+                gtk::glib::ControlFlow::Break
+            });
+        }
+    }
+}
+
+fn find_save_button(widget: &gtk::Widget) -> Option<gtk::Button> {
+    if let Some(btn) = widget.downcast_ref::<gtk::Button>() {
+        if let Some(action_name) = btn.action_name() {
+            if action_name == "app.save" {
+                return Some(btn.clone());
+            }
+        }
+    }
+    
+    let mut child = widget.first_child();
+    while let Some(c) = child {
+        if let Some(btn) = find_save_button(&c) {
+            return Some(btn);
+        }
+        child = c.next_sibling();
+    }
+    
+    None
 }
