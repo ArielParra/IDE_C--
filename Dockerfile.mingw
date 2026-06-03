@@ -74,10 +74,10 @@ RUN cat > /usr/local/bin/build-windows << 'SH'
 set -e
 
 cargo build --release --target x86_64-pc-windows-gnu
-mkdir -p /tmp/output
+mkdir -p /tmp/output/src
 cp target/x86_64-pc-windows-gnu/release/IDE_C--.exe /tmp/output/
-cp src/styles.css /tmp/output/
-cp -r src/resources /tmp/output/
+cp src/styles.css /tmp/output/src/
+cp -r src/resources /tmp/output/src/
 cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/*.dll /tmp/output/
 cd /tmp/output
 zip -r /build/IDE_C--_windows_mingw.zip .

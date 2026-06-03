@@ -53,10 +53,10 @@ cd /opt/quasi-msys2
 source env/vars.src
 cd /build
 cargo build --release
-mkdir -p /tmp/output
+mkdir -p /tmp/output/src
 cp target/${CARGO_BUILD_TARGET}/release/IDE_C--.exe /tmp/output/
-cp src/styles.css /tmp/output/
-cp -r src/resources /tmp/output/
+cp src/styles.css /tmp/output/src/
+cp -r src/resources /tmp/output/src/
 cd /tmp/output
 zip -r /build/IDE_C--_windows_msys2.zip .
 echo "Done: IDE_C--_windows_msys2.zip"
