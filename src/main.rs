@@ -8,16 +8,19 @@ mod tests;
 
 use gtk::gdk::Display;
 use gtk::gio;
-use gtk::Application;
+use gtk::{Application, IconTheme};
 use gtk::{prelude::*, CssProvider};
 
 fn main() {
+    gio::resources_register_include!("compiled.gresource").expect("Failed to register resources.");
+
     let app = Application::builder()
         .application_id("com.ide_cmm.ide")
         .build();
 
     app.connect_startup(|app| {
         load_css();
+        setup_icons();
         apply_system_theme();
 
         // Standard IDE keyboard shortcuts
@@ -46,8 +49,7 @@ fn main() {
 
 fn load_css() {
     let provider = CssProvider::new();
-    let css = gio::File::for_path("src/styles.css");
-    provider.load_from_file(&css);
+    provider.load_from_resource("/com/ide_cmm/ide/styles.css");
 
     gtk::style_context_add_provider_for_display(
         &Display::default().expect("Could not connect to a display."),
@@ -87,5 +89,13 @@ fn apply_system_theme() {
                 settings.is_gtk_application_prefer_dark_theme(),
             );
         }
+    }
+}
+
+fn setup_icons() {
+    if let Some(display) = Display::default() {
+        let icon_theme = IconTheme::for_display(&display);
+        icon_theme.add_resource_path("/com/ide_cmm/ide");
+        gtk::Window::set_default_icon_name("C--_Logo");
     }
 }

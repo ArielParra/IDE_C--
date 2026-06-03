@@ -149,7 +149,9 @@ docker build -f Dockerfile.mingw -t ide-cmm-mingw .
 docker run --rm -v "$(pwd)":/build ide-cmm-mingw
 ```
 
-The MSYS2 image uses [quasi-msys2](https://github.com/HolyBlackCat/quasi-msys2) packages, and the MinGW image uses Fedora's MinGW toolchain. Both generate `IDE_C--_windows.zip` in the project directory with the Windows executable and required runtime files.
+The MSYS2 image uses [quasi-msys2](https://github.com/HolyBlackCat/quasi-msys2) packages, and the MinGW image uses Fedora's MinGW toolchain. Both generate a `.zip` archive (`IDE_C--_windows_msys2.zip` and `IDE_C--_windows_mingw.zip` respectively) in the project directory.
+
+> **Note on Portability:** These Windows builds are completely standalone and portable. All required dynamic libraries (`.dll` files for GTK4, GLib, Pango, etc.) are bundled directly alongside the `.exe` inside the archive. You can extract the folder anywhere on a Windows machine and run it immediately without needing to install MSYS2 or any global dependencies.
 
 ---
 

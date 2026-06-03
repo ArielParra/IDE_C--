@@ -10,3 +10,6 @@ sourceview5 = "0.7"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.52"
+
+[build-dependencies]
+glib-build-tools = "0.22.0"

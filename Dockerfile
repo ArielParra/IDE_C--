@@ -29,7 +29,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /build/target/release/IDE_C-- /usr/local/bin/IDE_C--
-COPY --from=builder /build/src/styles.css /usr/local/share/IDE_C--/src/styles.css
 COPY --from=builder /build/src/resources /usr/local/share/IDE_C--/src/resources
 
 WORKDIR /usr/local/share/IDE_C--

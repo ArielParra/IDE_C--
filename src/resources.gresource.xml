@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gresources>
+  <gresource prefix="/com/ide_cmm/ide">
+    <file>styles.css</file>
+    <file alias="C--_Logo.svg">resources/C--_Logo.svg</file>
+  </gresource>
+</gresources>

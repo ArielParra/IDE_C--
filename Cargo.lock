@@ -7,6 +7,7 @@ name = "IDE_C--"
 version = "0.1.0"
 dependencies = [
  "glib 0.22.3",
+ "glib-build-tools",
  "gtk4",
  "sourceview5",
  "winreg",
@@ -166,7 +167,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "50e1f5f1b0bfb830d6ccc8066d18db35c487b1b2b1e8589b5dfe9f07e8defaec"
 dependencies = [
  "gdk-pixbuf-sys",
- "gio",
+ "gio 0.18.4",
  "glib 0.18.5",
  "libc",
  "once_cell",
@@ -194,7 +195,7 @@ dependencies = [
  "cairo-rs",
  "gdk-pixbuf",
  "gdk4-sys",
- "gio",
+ "gio 0.18.4",
  "glib 0.18.5",
  "libc",
  "pango",
@@ -234,6 +235,23 @@ dependencies = [
  "pin-project-lite",
  "smallvec",
  "thiserror",
+]
+
+[[package]]
+name = "gio"
+version = "0.22.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e3848bcba3a35cc0a71df8ba8ecfd799d6bfb862342a53a4a915fb62213aa4e6"
+dependencies = [
+ "futures-channel",
+ "futures-core",
+ "futures-io",
+ "futures-util",
+ "gio-sys 0.22.0",
+ "glib 0.22.3",
+ "libc",
+ "pin-project-lite",
+ "smallvec",
 ]
 
 [[package]]
@@ -304,6 +322,15 @@ dependencies = [
  "libc",
  "memchr",
  "smallvec",
+]
+
+[[package]]
+name = "glib-build-tools"
+version = "0.22.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bf3abfd1e60b194dded50f802277c68a59121a5a221701102f02db223cdda27"
+dependencies = [
+ "gio 0.22.6",
 ]
 
 [[package]]
@@ -439,7 +466,7 @@ dependencies = [
  "futures-channel",
  "gdk-pixbuf",
  "gdk4",
- "gio",
+ "gio 0.18.4",
  "glib 0.18.5",
  "graphene-rs",
  "gsk4",
@@ -543,7 +570,7 @@ version = "0.18.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ca27ec1eb0457ab26f3036ea52229edbdb74dee1edd29063f5b9b010e7ebee4"
 dependencies = [
- "gio",
+ "gio 0.18.4",
  "glib 0.18.5",
  "libc",
  "once_cell",
@@ -720,7 +747,7 @@ dependencies = [
  "futures-core",
  "gdk-pixbuf",
  "gdk4",
- "gio",
+ "gio 0.18.4",
  "glib 0.18.5",
  "gtk4",
  "libc",

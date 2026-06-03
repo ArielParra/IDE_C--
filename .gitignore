@@ -34,6 +34,10 @@ Desktop.ini
 *.exe
 *.dll
 *.lib
+IDE_C--_windows_mingw/
+IDE_C--_windows_mingw.zip
+IDE_C--_windows_msys2/
+IDE_C--_windows_msys2.zip
 
 # Logs
 *.log
