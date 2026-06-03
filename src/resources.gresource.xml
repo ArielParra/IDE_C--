@@ -3,5 +3,9 @@
   <gresource prefix="/com/ide_cmm/ide">
     <file>styles.css</file>
     <file alias="C--_Logo.svg">resources/C--_Logo.svg</file>
+    <file>resources/language-specs/cmm.lang</file>
+    <file>resources/language-specs/language.rng</file>
+    <file>resources/styles/dark.xml</file>
+    <file>resources/styles/light.xml</file>
   </gresource>
 </gresources>
