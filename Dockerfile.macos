@@ -1,0 +1,42 @@
+# =============================================
+# macOS Cross-Compilation via Darling
+#
+# WARNING: This image requires the `darling-mach` kernel module 
+# to be loaded on your Linux host. It will NOT work on macOS/Windows hosts 
+# via Docker Desktop, nor on Linux hosts without the kernel module.
+#
+# Usage:
+#   sudo modprobe darling-mach
+#   docker build -f Dockerfile.macos -t ide-cmm-macos .
+#   docker run --rm --privileged -v "$(pwd)":/build ide-cmm-macos
+#
+# Output: macOS binary in target/release/IDE_C--
+# =============================================
+FROM darlinghq/darling:latest
+
+# Install basic Linux dependencies that might be needed to bootstrap Darling
+RUN apt-get update && apt-get install -y curl ca-certificates && rm -rf /var/lib/apt/lists/*
+
+# Install Homebrew inside the Darling macOS layer
+RUN darling shell -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+
+# Add brew to PATH inside darling profile so subsequent commands find it
+RUN darling shell -c 'echo "export PATH=/usr/local/bin:/usr/local/sbin:\$PATH" >> ~/.bash_profile'
+
+# Install project dependencies using brew inside Darling
+# Note: GTK4 compilation on Darling might fail due to missing Cocoa/Quartz frameworks in Darling.
+RUN darling shell -c 'source ~/.bash_profile && brew install rust gtk4 gtksourceview5 pkg-config gcc'
+
+WORKDIR /build
+
+# Build script that executes cargo inside Darling
+RUN echo '#!/bin/bash\n\
+set -e\n\
+echo "Starting macOS build inside Darling..."\n\
+darling shell -c "source ~/.bash_profile && cd /Volumes/SystemRoot/build && cargo build --release"\n\
+echo "Build finished."\n\
+' > /usr/local/bin/build-macos && \
+    chmod +x /usr/local/bin/build-macos
+
+# Ensure we run with privileged mode
+CMD ["/usr/local/bin/build-macos"]

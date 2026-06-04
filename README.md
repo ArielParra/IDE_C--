@@ -106,6 +106,16 @@ cargo build --release
 
 The binary will be at `target/release/IDE_C--`.
 
+### Installation
+
+On Linux, you can install the application locally without `sudo` by running:
+
+```sh
+make install
+```
+
+This will place the executable in `~/.local/bin`, the desktop entry in `~/.local/share/applications`, and the icons in `~/.local/share/icons/hicolor`. To uninstall, run `make uninstall`.
+
 ---
 
 ## Docker
@@ -118,22 +128,45 @@ Build the project inside a Debian Trixie slim container. This keeps the exported
 docker build -t ide-cmm-linux .
 ```
 
-To export the compiled Linux binary from the image to your host:
+To compile and output the Linux binary to your host machine:
 
 ```sh
-container_id=$(docker create ide-cmm-linux)
-docker cp "$container_id":/usr/local/bin/IDE_C-- ./IDE_C--
-docker rm "$container_id"
-chmod +x ./IDE_C--
+docker run --rm -v "$(pwd)":/build ide-cmm-linux
 ```
 
-This produces a glibc Linux executable named `IDE_C--` in the project directory. Run it on the host with:
+This will compile the project in the container and automatically place the executable at `target/release/IDE_C--`. Run it on the host with:
 
 ```sh
-./IDE_C--
+./target/release/IDE_C--
 ```
 
 The host system still needs the GTK4 and GtkSourceView5 runtime libraries installed.
+
+### Linux AppImage (Portable)
+
+If you want to create a standalone, portable Linux executable that bundles GTK4 and its dependencies (an `.AppImage`), you can use the AppImage builder:
+
+```sh
+docker build -f Dockerfile.appimage -t ide-cmm-appimage .
+docker run --rm -v "$(pwd)":/build ide-cmm-appimage
+```
+
+This will compile the project and use `linuxdeploy` to generate an AppImage file. The final `IDE_C---x86_64.AppImage` will be placed in the `releases/` directory.
+
+### macOS Cross-Compilation (Experimental)
+
+> **WARNING:** This macOS cross-compilation image relies on [Darling](https://www.darlinghq.org/), which requires the `darling-mach` kernel module to be compiled and loaded on your physical Linux host. This Docker container **will fail** if you run it on native Windows, macOS, or a Linux host without the kernel module. Additionally, Homebrew support inside Darling is highly experimental and compiling heavy GUI frameworks like GTK4 may fail.
+
+```sh
+# On your Linux host, ensure the module is loaded:
+sudo modprobe darling-mach
+
+# Build and run the Darling image (requires --privileged):
+docker build -f Dockerfile.macos -t ide-cmm-macos .
+docker run --rm --privileged -v "$(pwd)":/build ide-cmm-macos
+```
+
+The macOS binary will be output to `target/release/IDE_C--`. For a truly production-ready macOS build, it is highly recommended to use a native macOS machine, GitHub Actions or a Virtual Machine instead of Docker.
 
 ### Windows Cross-Compilation
 
@@ -149,7 +182,7 @@ docker build -f Dockerfile.mingw -t ide-cmm-mingw .
 docker run --rm -v "$(pwd)":/build ide-cmm-mingw
 ```
 
-The MSYS2 image uses [quasi-msys2](https://github.com/HolyBlackCat/quasi-msys2) packages, and the MinGW image uses Fedora's MinGW toolchain. Both generate a `.zip` archive (`IDE_C--_windows_msys2.zip` and `IDE_C--_windows_mingw.zip` respectively) in the project directory.
+The MSYS2 image uses [quasi-msys2](https://github.com/HolyBlackCat/quasi-msys2) packages, and the MinGW image uses Fedora's MinGW toolchain. Both generate a `.zip` archive (`IDE_C--_windows_msys2.zip` and `IDE_C--_windows_mingw.zip` respectively) in the `releases/` directory.
 
 > **Note on Portability:** These Windows builds are completely standalone and portable. All required dynamic libraries (`.dll` files for GTK4, GLib, Pango, etc.) are bundled directly alongside the `.exe` inside the archive. You can extract the folder anywhere on a Windows machine and run it immediately without needing to install MSYS2 or any global dependencies.
 

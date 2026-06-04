@@ -1,0 +1,76 @@
+# =============================================
+# Linux AppImage Packaging
+# Usage:
+#   docker build -f Dockerfile.appimage -t ide-cmm-appimage .
+#   docker run --rm -v "$(pwd)":/build ide-cmm-appimage
+#
+# Output: releases/IDE_C---x86_64.AppImage in your working directory
+# =============================================
+FROM debian:trixie-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential pkg-config curl wget ca-certificates \
+    libgtk-4-dev libgtksourceview-5-dev \
+    file desktop-file-utils appstream \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
+    | sh -s -- -y --default-toolchain stable
+ENV PATH="/root/.cargo/bin:$PATH"
+ENV PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
+
+WORKDIR /opt
+
+# Download linuxdeploy and GTK plugin
+RUN wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage && \
+    chmod +x linuxdeploy-x86_64.AppImage && \
+    ./linuxdeploy-x86_64.AppImage --appimage-extract && \
+    mv squashfs-root linuxdeploy && \
+    rm linuxdeploy-x86_64.AppImage
+
+RUN wget -q https://raw.githubusercontent.com/linuxdeploy/linuxdeploy-plugin-gtk/master/linuxdeploy-plugin-gtk.sh && \
+    chmod +x linuxdeploy-plugin-gtk.sh
+
+# Add the extracted linuxdeploy plugin and executable to PATH
+ENV PATH="/opt:/opt/linuxdeploy/AppRun:$PATH"
+
+WORKDIR /build
+
+RUN cat > /usr/local/bin/build-appimage << 'SH'
+#!/bin/bash
+set -e
+
+echo "Building Linux binary for AppImage..."
+cargo build --release --target-dir=/tmp/target
+
+# Prepare AppDir
+export APPDIR=/tmp/AppDir
+mkdir -p $APPDIR/usr/bin
+mkdir -p $APPDIR/usr/share/applications
+mkdir -p $APPDIR/usr/share/icons/hicolor/256x256/apps
+
+cp /tmp/target/release/IDE_C-- $APPDIR/usr/bin/
+cp src/resources/com.ide_cmm.ide.desktop $APPDIR/usr/share/applications/
+cp -r src/resources/icons/hicolor/* $APPDIR/usr/share/icons/hicolor/
+
+echo "Running linuxdeploy..."
+export OUTPUT=/build/releases/IDE_C---x86_64.AppImage
+mkdir -p /build/releases
+
+# The plugin requires these to locate the AppDir correctly
+export LINUXDEPLOY_OUTPUT_VERSION="1.0"
+
+# Using the extracted AppRun as the linuxdeploy executable
+/opt/linuxdeploy/AppRun \
+    --appdir $APPDIR \
+    --desktop-file src/resources/com.ide_cmm.ide.desktop \
+    --icon-file src/resources/icons/hicolor/256x256/apps/com.ide_cmm.ide.png \
+    --plugin gtk \
+    --output appimage
+
+echo "Done: releases/IDE_C---x86_64.AppImage"
+SH
+
+RUN chmod +x /usr/local/bin/build-appimage
+
+CMD ["/usr/local/bin/build-appimage"]

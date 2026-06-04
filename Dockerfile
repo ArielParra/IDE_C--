@@ -1,7 +1,12 @@
 # =============================================
-# Stage 1: Build a glibc Linux binary
+# Linux native compilation
+# Usage:
+#   docker build -t ide-cmm-linux .
+#   docker run --rm -v "$(pwd)":/build ide-cmm-linux
+#
+# Output: IDE_C-- binary in target/release/
 # =============================================
-FROM debian:trixie-slim AS builder
+FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config curl ca-certificates \
@@ -14,27 +19,19 @@ ENV PATH="/root/.cargo/bin:$PATH"
 ENV PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
 
 WORKDIR /build
-COPY . .
 
-RUN cargo build --release
+RUN cat > /usr/local/bin/build-linux << 'SH'
+#!/bin/sh
+set -e
 
-# =============================================
-# Stage 2: Small glibc runtime/export image
-# =============================================
-FROM debian:trixie-slim
+echo "Building Linux binary..."
+cargo build --release --target-dir=/tmp/target
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libgtk-4-1 libgtksourceview-5-0 \
-    adwaita-icon-theme fonts-noto-core \
-    && rm -rf /var/lib/apt/lists/*
+mkdir -p /build/target/release
+cp /tmp/target/release/IDE_C-- /build/target/release/IDE_C--
+echo "Done: Binary placed in target/release/IDE_C--"
+SH
 
-COPY --from=builder /build/target/release/IDE_C-- /usr/local/bin/IDE_C--
-COPY --from=builder /build/src/resources /usr/local/share/IDE_C--/src/resources
-COPY --from=builder /build/src/resources/icons/hicolor /usr/share/icons/hicolor
-COPY --from=builder /build/src/resources/com.ide_cmm.ide.desktop /usr/share/applications/com.ide_cmm.ide.desktop
+RUN chmod +x /usr/local/bin/build-linux
 
-RUN gtk-update-icon-cache -f /usr/share/icons/hicolor || true
-
-WORKDIR /usr/local/share/IDE_C--
-
-CMD ["IDE_C--"]
+CMD ["/usr/local/bin/build-linux"]

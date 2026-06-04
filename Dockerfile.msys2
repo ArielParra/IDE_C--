@@ -6,7 +6,7 @@
 #   docker build -f Dockerfile.msys2 -t ide-cmm-msys2 .
 #   docker run --rm -v "$(pwd)":/build ide-cmm-msys2
 #
-# Output: IDE_C--_windows_msys2.zip in your working directory
+# Output: releases/IDE_C--_windows_msys2.zip in your working directory
 # =============================================
 FROM debian:trixie-slim
 
@@ -64,8 +64,9 @@ cp target/${CARGO_BUILD_TARGET}/release/IDE_C--.exe /tmp/output/
 cp -r src/resources /tmp/output/src/
 cp /ucrt64/bin/*.dll /tmp/output/ 2>/dev/null || cp /opt/quasi-msys2/root/ucrt64/bin/*.dll /tmp/output/
 cd /tmp/output
-zip -r /build/IDE_C--_windows_msys2.zip .
-echo "Done: IDE_C--_windows_msys2.zip"
+mkdir -p /build/releases
+zip -r /build/releases/IDE_C--_windows_msys2.zip .
+echo "Done: releases/IDE_C--_windows_msys2.zip"
 SH
 
 RUN chmod +x /usr/local/bin/build-windows
