@@ -4,14 +4,14 @@
 #   docker build -f Dockerfile.appimage -t ide-cmm-appimage .
 #   docker run --rm -v "$(pwd)":/build ide-cmm-appimage
 #
-# Output: releases/IDE_C---x86_64.AppImage in your working directory
+# Output: target/release/IDE_C--.AppImage in your working directory
 # =============================================
 FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config curl wget ca-certificates \
     libgtk-4-dev libgtksourceview-5-dev \
-    file desktop-file-utils appstream \
+    file desktop-file-utils appstream librsvg2-dev librsvg2-common \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
@@ -54,8 +54,8 @@ cp src/resources/com.ide_cmm.ide.desktop $APPDIR/usr/share/applications/
 cp -r src/resources/icons/hicolor/* $APPDIR/usr/share/icons/hicolor/
 
 echo "Running linuxdeploy..."
-export OUTPUT=/build/releases/IDE_C---x86_64.AppImage
-mkdir -p /build/releases
+export LDAI_OUTPUT=/build/target/release/IDE_C--.AppImage
+mkdir -p /build/target/release
 
 # The plugin requires these to locate the AppDir correctly
 export LINUXDEPLOY_OUTPUT_VERSION="1.0"
@@ -68,7 +68,9 @@ export LINUXDEPLOY_OUTPUT_VERSION="1.0"
     --plugin gtk \
     --output appimage
 
-echo "Done: releases/IDE_C---x86_64.AppImage"
+chown -R $(stat -c "%u:%g" /build) /build/target/release/IDE_C--.AppImage
+
+echo "Done: target/release/IDE_C--.AppImage"
 SH
 
 RUN chmod +x /usr/local/bin/build-appimage
