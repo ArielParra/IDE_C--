@@ -107,7 +107,7 @@ impl<'a> Parser<'a> {
 
     pub(crate) fn can_start_statement(&self) -> bool {
         matches!(self.current().map(|t| t.token_type.as_str()),
-            Some("IF") | Some("WHILE") | Some("DO") | Some("CIN") | Some("COUT") | Some("ID")
+            Some("IF") | Some("WHILE") | Some("DO") | Some("CIN") | Some("COUT") | Some("ID") | Some("INT_T") | Some("FLOAT_T") | Some("BOOL_T")
         )
     }
 
@@ -158,7 +158,7 @@ impl<'a> Parser<'a> {
         node
     }
 
-    fn parse_variable_declaration(&mut self) -> AstNode {
+    pub(crate) fn parse_variable_declaration(&mut self) -> AstNode {
         let (decl_line, decl_col) = self.location_or_zero();
         let mut node = AstNode::new("VariableDeclaration").with_pos(decl_line, decl_col);
         if let Some(token) = self.advance() {

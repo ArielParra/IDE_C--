@@ -1,8 +1,11 @@
+#[derive(Debug, Clone, Default)]
 pub struct AstNode {
     pub label: String,
     pub children: Vec<AstNode>,
     pub line: Option<usize>,
     pub column: Option<usize>,
+    pub annotated_type: Option<String>,
+    pub attributed_value: Option<String>,
 }
 
 impl AstNode {
@@ -12,6 +15,8 @@ impl AstNode {
             children: Vec::new(),
             line: None,
             column: None,
+            annotated_type: None,
+            attributed_value: None,
         }
     }
 
@@ -30,10 +35,12 @@ impl AstNode {
     pub fn add_child(&mut self, child: AstNode) {
         self.children.push(child);
     }
-}
 
-impl Default for AstNode {
-    fn default() -> Self {
-        AstNode::new("")
+    pub fn annotate_type(&mut self, type_name: &str) {
+        self.annotated_type = Some(type_name.to_string());
+    }
+
+    pub fn annotate_value(&mut self, value: &str) {
+        self.attributed_value = Some(value.to_string());
     }
 }

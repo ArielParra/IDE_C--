@@ -16,6 +16,7 @@ impl Parser<'_> {
             Some("DO") => self.parse_repetition().with_opt_pos(line, column),
             Some("CIN") => self.parse_input().with_opt_pos(line, column),
             Some("COUT") => self.parse_output().with_opt_pos(line, column),
+            Some("INT_T") | Some("FLOAT_T") | Some("BOOL_T") => self.parse_variable_declaration().with_opt_pos(line, column),
             Some("ID") => self.parse_id_statement().with_opt_pos(line, column),
             Some(_token_type) => {
                 let (line_val, column_val, found) = self.location_details();

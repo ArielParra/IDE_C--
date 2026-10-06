@@ -10,6 +10,7 @@ pub struct PanelNotebooks {
     pub lexic_view: Rc<RefCell<TextView>>,
     pub errors_view: Rc<RefCell<TextView>>,
     pub syntax_errors_view: Rc<RefCell<TextView>>,
+    pub semantic_errors_view: Rc<RefCell<TextView>>,
     pub ast_view: Rc<RefCell<AstView>>,
 }
 
@@ -17,10 +18,11 @@ pub fn create_panels() -> PanelNotebooks {
     let lexic_view = Rc::new(RefCell::new(TextView::new()));
     let errors_view = Rc::new(RefCell::new(TextView::new()));
     let syntax_errors_view = Rc::new(RefCell::new(TextView::new()));
+    let semantic_errors_view = Rc::new(RefCell::new(TextView::new()));
     let ast_view = Rc::new(RefCell::new(AstView::new()));
 
     let debug_notebook = create_debug_notebook(&lexic_view, &ast_view);
-    let errors_notebook = create_errors_notebook(&errors_view, &syntax_errors_view);
+    let errors_notebook = create_errors_notebook(&errors_view, &syntax_errors_view, &semantic_errors_view);
 
     PanelNotebooks {
         debug: debug_notebook,
@@ -28,6 +30,7 @@ pub fn create_panels() -> PanelNotebooks {
         lexic_view,
         errors_view,
         syntax_errors_view,
+        semantic_errors_view,
         ast_view,
     }
 }
@@ -69,6 +72,7 @@ fn create_debug_notebook(
 fn create_errors_notebook(
     errors_view: &Rc<RefCell<TextView>>, 
     syntax_errors_view: &Rc<RefCell<TextView>>,
+    semantic_errors_view: &Rc<RefCell<TextView>>,
 ) -> Notebook {
     let notebook = Notebook::new();
     let labels = [
@@ -85,6 +89,10 @@ fn create_errors_notebook(
             with_copy_button(&tv)
         } else if i == 1 {
             let tv = syntax_errors_view.borrow().clone();
+            tv.set_editable(false);
+            with_copy_button(&tv)
+        } else if i == 2 {
+            let tv = semantic_errors_view.borrow().clone();
             tv.set_editable(false);
             with_copy_button(&tv)
         } else {

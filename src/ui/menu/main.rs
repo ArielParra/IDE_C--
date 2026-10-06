@@ -18,6 +18,7 @@ pub fn build_menu(
     lex_view: Rc<RefCell<TextView>>,
     errors_view: Rc<RefCell<TextView>>,
     syntax_errors_view: Rc<RefCell<TextView>>,
+    semantic_errors_view: Rc<RefCell<TextView>>,
     ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     debug_notebook: gtk::Notebook,
     errors_notebook: gtk::Notebook,
@@ -28,6 +29,7 @@ pub fn build_menu(
 
     ErrorNavigator::connect_error_click(&errors_view, &editor_buffer, &editor_view);
     ErrorNavigator::connect_error_click(&syntax_errors_view, &editor_buffer, &editor_view);
+    ErrorNavigator::connect_error_click(&semantic_errors_view, &editor_buffer, &editor_view);
     LexicNavigator::connect_position_click(&lex_view, &editor_buffer, &editor_view);
     AstNavigator::connect_ast_click(&ast_view, &editor_buffer, &editor_view);
 
@@ -40,6 +42,7 @@ pub fn build_menu(
         lex_view,
         errors_view,
         syntax_errors_view,
+        semantic_errors_view,
         ast_view,
         debug_notebook,
         errors_notebook,

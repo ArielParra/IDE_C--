@@ -22,6 +22,7 @@ impl ActionHandlers {
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
         syntax_errors_view: Rc<RefCell<TextView>>,
+        semantic_errors_view: Rc<RefCell<TextView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         debug_notebook: gtk::Notebook,
         errors_notebook: gtk::Notebook,
@@ -39,12 +40,30 @@ impl ActionHandlers {
             lex_view.clone(),
             errors_view.clone(),
             syntax_errors_view.clone(),
+            semantic_errors_view.clone(),
             ast_view.clone(),
         );
         Self::register_find_action(app, window, &buffer_clone, &editor_view, search_bar, search_entry);
         Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view, debug_notebook.clone(), errors_notebook.clone(), file_state.clone());
         Self::register_compile_action(app, window, file_state.clone());
-        Self::register_syntax_action(app, &buffer_clone, syntax_errors_view, ast_view, debug_notebook, errors_notebook, file_state);
+        Self::register_syntax_action(
+            app,
+            &buffer_clone,
+            syntax_errors_view,
+            ast_view.clone(),
+            debug_notebook.clone(),
+            errors_notebook.clone(),
+            file_state.clone(),
+        );
+        Self::register_semantic_action(
+            app,
+            &buffer_clone,
+            semantic_errors_view,
+            ast_view,
+            debug_notebook,
+            errors_notebook,
+            file_state,
+        );
     }
 
     fn register_file_actions(
@@ -55,6 +74,7 @@ impl ActionHandlers {
         lex_view: Rc<RefCell<TextView>>,
         errors_view: Rc<RefCell<TextView>>,
         syntax_errors_view: Rc<RefCell<TextView>>,
+        semantic_errors_view: Rc<RefCell<TextView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     ) {
         let buffer_clone = buffer.clone();
@@ -63,6 +83,7 @@ impl ActionHandlers {
         let lex_view_clone = lex_view.clone();
         let errors_view_clone = errors_view.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
+        let semantic_errors_view_clone = semantic_errors_view.clone();
         let ast_view_clone = ast_view.clone();
         let window_clone_new = window.clone();
         new_action.connect_activate(move |_, _| {
@@ -73,6 +94,7 @@ impl ActionHandlers {
                 lex_view_clone.clone(),
                 errors_view_clone.clone(),
                 syntax_errors_view_clone.clone(),
+                semantic_errors_view_clone.clone(),
                 ast_view_clone.clone(),
             );
         });
@@ -85,6 +107,7 @@ impl ActionHandlers {
         let lex_view_clone = lex_view.clone();
         let errors_view_clone = errors_view.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
+        let semantic_errors_view_clone = semantic_errors_view.clone();
         let ast_view_clone2 = ast_view.clone();
         open_action.connect_activate(move |_, _| {
             file_manager::file_ops::flash_action_button(&window_clone, "app.open");
@@ -95,6 +118,7 @@ impl ActionHandlers {
                 lex_view_clone.clone(),
                 errors_view_clone.clone(),
                 syntax_errors_view_clone.clone(),
+                semantic_errors_view_clone.clone(),
                 ast_view_clone2.clone(),
             );
         });
@@ -370,6 +394,104 @@ impl ActionHandlers {
         });
 
         app.add_action(&syntax_action);
+    }
+
+    fn register_semantic_action(
+        app: &Application,
+        buffer: &gtk::TextBuffer,
+        semantic_errors_view: Rc<RefCell<TextView>>,
+        ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
+        debug_notebook: gtk::Notebook,
+        errors_notebook: gtk::Notebook,
+        file_state: Rc<RefCell<Option<PathBuf>>>,
+    ) {
+        let semantic_action = gio::SimpleAction::new("semantic", None);
+        let semantic_errors_view_clone = semantic_errors_view.clone();
+        let ast_view_clone = ast_view.clone();
+        let file_state_clone = file_state.clone();
+        let _buffer_clone = buffer.clone();
+
+        semantic_action.connect_activate(move |_, _| {
+            debug_notebook.set_current_page(Some(2));
+            errors_notebook.set_current_page(Some(2));
+
+            let err_buffer = semantic_errors_view_clone.borrow().buffer();
+            err_buffer.set_text("");
+
+            let tokens_path = match &*file_state_clone.borrow() {
+                Some(p) => {
+                    let mut p = p.clone();
+                    let file_name = p.file_name().unwrap().to_string_lossy().into_owned();
+                    p.set_file_name(format!("{}.tokens", file_name));
+                    p
+                }
+                None => std::path::PathBuf::from("untitled.c--.tokens"),
+            };
+
+            let tokens = crate::compiler::parser::read_tokens_from_file(&tokens_path);
+            if tokens.is_empty() {
+                let error_tag = err_buffer.create_tag(
+                    None,
+                    &[("foreground", &"#f44747"), ("weight", &700i32)],
+                );
+                let mut iter = err_buffer.end_iter();
+                let message = "⚠ Error: No tokens found. Please run Lexical Analysis first.";
+                if let Some(ref tag) = error_tag {
+                    err_buffer.insert_with_tags(&mut iter, message, &[tag]);
+                } else {
+                    err_buffer.insert(&mut iter, message);
+                }
+                return;
+            }
+
+            let (ast, syntax_errors) = crate::compiler::parser::build_ast_from_tokens(&tokens);
+            ast_view_clone.borrow().populate(&ast);
+
+            if !syntax_errors.is_empty() {
+                let warning_tag = err_buffer.create_tag(
+                    None,
+                    &[("foreground", &"#f4a300"), ("weight", &700i32)],
+                );
+                let mut warning_iter = err_buffer.end_iter();
+                let warning_message = "⚠ Syntax errors are present; semantic analysis will continue where the AST is still usable.\n";
+                if let Some(ref tag) = warning_tag {
+                    err_buffer.insert_with_tags(&mut warning_iter, warning_message, &[tag]);
+                } else {
+                    err_buffer.insert(&mut warning_iter, warning_message);
+                }
+            }
+
+            let semantic_errors = crate::compiler::semantic::SemanticAnalyzer::analyze(&ast);
+            let error_link_tag = err_buffer.create_tag(
+                None,
+                &[
+                    ("foreground", &"#1a73e8"),
+                    ("underline", &Underline::Single),
+                ],
+            );
+
+            if semantic_errors.is_empty() {
+                err_buffer.set_text("No semantic errors detected.");
+            } else {
+                for error in &semantic_errors {
+                    let mut message_iter = err_buffer.end_iter();
+                    err_buffer.insert(&mut message_iter, &format!("Semantic error: {} ", error.message));
+
+                    let mut link_iter = err_buffer.end_iter();
+                    let link_text = format!("({}:{})", error.line, error.column);
+                    if let Some(ref tag) = error_link_tag {
+                        err_buffer.insert_with_tags(&mut link_iter, &link_text, &[tag]);
+                    } else {
+                        err_buffer.insert(&mut link_iter, &link_text);
+                    }
+
+                    let mut newline_iter = err_buffer.end_iter();
+                    err_buffer.insert(&mut newline_iter, "\n");
+                }
+            }
+        });
+
+        app.add_action(&semantic_action);
     }
 
     fn register_compile_action(app: &Application, window: &ApplicationWindow, file_state: Rc<RefCell<Option<PathBuf>>>) {

@@ -51,3 +51,20 @@ impl SyntaxError {
         }
     }
 }
+
+#[derive(Debug, Clone)]
+pub struct SemanticError {
+    pub message: String,
+    pub line: usize,
+    pub column: usize,
+}
+
+impl SemanticError {
+    pub fn new(message: &str, line: usize, column: usize) -> Self {
+        Self {
+            message: message.to_string(),
+            line,
+            column,
+        }
+    }
+}
