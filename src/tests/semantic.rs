@@ -16,6 +16,77 @@ fn test_semantic_analysis_accepts_valid_program() {
 }
 
 #[test]
+fn test_semantic_analysis_collects_symbol_table_positions_and_appearance_lines() {
+    let code = "main {\n int x;\n x = 1;\n if (true) { int y; y = x; }\n x = x + 1;\n}";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+
+    let (errors, symbols) = SemanticAnalyzer::analyze_with_symbol_table(&ast);
+    assert!(errors.is_empty(), "Expected no semantic errors: {:?}", errors);
+    assert_eq!(symbols.len(), 2);
+
+    assert_eq!(symbols[0].name, "x");
+    assert_eq!(symbols[0].data_type.as_str(), "int");
+    assert_eq!(symbols[0].memory_position, 1);
+    assert_eq!(symbols[0].lines, vec![2, 3, 4, 5]);
+
+    assert_eq!(symbols[1].name, "y");
+    assert_eq!(symbols[1].data_type.as_str(), "int");
+    assert_eq!(symbols[1].memory_position, 2);
+    assert_eq!(symbols[1].lines, vec![4]);
+}
+
+#[test]
+fn test_semantic_analysis_collects_all_identifiers_from_multiple_declarations() {
+    let code = "main {\n int x, y, z;\n float a, b, c;\n}";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+
+    let (errors, symbols) = SemanticAnalyzer::analyze_with_symbol_table(&ast);
+    assert!(errors.is_empty(), "Expected no semantic errors: {:?}", errors);
+    assert_eq!(
+        symbols
+            .iter()
+            .map(|symbol| (symbol.name.as_str(), symbol.data_type.as_str(), symbol.line))
+            .collect::<Vec<_>>(),
+        vec![
+            ("x", "int", 2),
+            ("y", "int", 2),
+            ("z", "int", 2),
+            ("a", "float", 3),
+            ("b", "float", 3),
+            ("c", "float", 3),
+        ]
+    );
+    assert!(symbols.iter().all(|symbol| symbol.lines == vec![symbol.line]));
+}
+
+#[test]
+fn test_semantic_analysis_tracks_values_at_each_identifier_occurrence() {
+    let code = "main {\n int x;\n int y;\n x = 2;\n y = x + 3;\n x = y * 2;\n y = x;\n}";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+
+    let (errors, _, values) = SemanticAnalyzer::analyze_with_symbol_values(&ast);
+    assert!(errors.is_empty(), "Expected no semantic errors: {:?}", errors);
+    assert_eq!(values.get(&(4, 2)).map(String::as_str), Some("2"));
+    assert_eq!(values.get(&(5, 2)).map(String::as_str), Some("5"));
+    assert_eq!(values.get(&(5, 6)).map(String::as_str), Some("2"));
+    assert_eq!(values.get(&(6, 2)).map(String::as_str), Some("10"));
+    assert_eq!(values.get(&(6, 6)).map(String::as_str), Some("5"));
+    assert_eq!(values.get(&(7, 6)).map(String::as_str), Some("10"));
+}
+
+#[test]
 fn test_semantic_analysis_detects_undeclared_variable() {
     let code = "main { x = 5; }";
     let (tokens, lex_errors) = analyze(code);

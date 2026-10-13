@@ -11,6 +11,8 @@ pub struct PanelNotebooks {
     pub errors_view: Rc<RefCell<TextView>>,
     pub syntax_errors_view: Rc<RefCell<TextView>>,
     pub semantic_errors_view: Rc<RefCell<TextView>>,
+    pub semantic_view: Rc<RefCell<TextView>>,
+    pub semantic_ast_view: Rc<RefCell<AstView>>,
     pub ast_view: Rc<RefCell<AstView>>,
 }
 
@@ -19,9 +21,11 @@ pub fn create_panels() -> PanelNotebooks {
     let errors_view = Rc::new(RefCell::new(TextView::new()));
     let syntax_errors_view = Rc::new(RefCell::new(TextView::new()));
     let semantic_errors_view = Rc::new(RefCell::new(TextView::new()));
+    let semantic_view = Rc::new(RefCell::new(TextView::new()));
+    let semantic_ast_view = Rc::new(RefCell::new(AstView::new()));
     let ast_view = Rc::new(RefCell::new(AstView::new()));
 
-    let debug_notebook = create_debug_notebook(&lexic_view, &ast_view);
+    let debug_notebook = create_debug_notebook(&lexic_view, &semantic_ast_view, &ast_view);
     let errors_notebook = create_errors_notebook(&errors_view, &syntax_errors_view, &semantic_errors_view);
 
     PanelNotebooks {
@@ -31,12 +35,15 @@ pub fn create_panels() -> PanelNotebooks {
         errors_view,
         syntax_errors_view,
         semantic_errors_view,
+        semantic_view,
+        semantic_ast_view,
         ast_view,
     }
 }
 
 fn create_debug_notebook(
     lexic_view: &Rc<RefCell<TextView>>,
+    semantic_ast_view: &Rc<RefCell<AstView>>,
     ast_view: &Rc<RefCell<AstView>>,
 ) -> Notebook {
     let notebook = Notebook::new();
@@ -56,6 +63,10 @@ fn create_debug_notebook(
         } else if i == 1 {
             let scrolled = ast_view.borrow().widget();
             scrolled.upcast()
+        } else if i == 2 {
+            semantic_ast_view.borrow().widget_with_attributes()
+        } else if i == 3 {
+            semantic_ast_view.borrow().widget_hash_table()
         } else {
             let tv = TextView::new();
             tv.set_editable(false);

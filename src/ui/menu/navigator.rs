@@ -124,6 +124,20 @@ impl LexicNavigator {
 pub struct AstNavigator;
 
 impl AstNavigator {
+    pub fn connect_semantic_location_click(
+        ast_view: &Rc<RefCell<crate::ui::panels::AstView>>,
+        editor_buffer: &gtk::TextBuffer,
+        editor_view: &SourceView,
+    ) {
+        let editor_buffer = editor_buffer.clone();
+        let editor_view = editor_view.clone();
+        ast_view
+            .borrow()
+            .set_location_navigator(move |line, column| {
+                ErrorNavigator::navigate_to(&editor_view, &editor_buffer, line, column);
+            });
+    }
+
     pub fn connect_ast_click(
         ast_view: &Rc<RefCell<crate::ui::panels::AstView>>,
         editor_buffer: &gtk::TextBuffer,

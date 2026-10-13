@@ -59,6 +59,8 @@ impl Window {
             panels.errors_view,
             panels.syntax_errors_view,
             panels.semantic_errors_view,
+            panels.semantic_view,
+            panels.semantic_ast_view.clone(),
             panels.ast_view.clone(),
             panels.debug.clone(),
             panels.errors.clone(),

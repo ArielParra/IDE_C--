@@ -1,6 +1,10 @@
 use gtk::prelude::*;
 use gtk::{gio, glib, Label, ListView, ScrolledWindow, SignalListItemFactory, SingleSelection, TreeExpander, TreeListModel};
+use std::cell::RefCell;
+use std::rc::Rc;
 use crate::models::ast::AstNode;
+use crate::compiler::semantic::{SemanticValueMap, Symbol};
+use crate::models::SemanticError;
 use crate::ui::language_style::LanguageStyle;
 
 mod imp {
@@ -25,6 +29,14 @@ mod imp {
         pub children_model: RefCell<Option<gio::ListStore>>,
         #[property(get, set)]
         pub is_last_child: RefCell<bool>,
+        #[property(get, set)]
+        pub node_type: RefCell<String>,
+        #[property(get, set)]
+        pub node_value: RefCell<String>,
+        #[property(get, set)]
+        pub node_attribute: RefCell<String>,
+        #[property(get, set)]
+        pub node_location: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -37,12 +49,67 @@ mod imp {
     impl ObjectImpl for AstNodeObject {}
 }
 
+mod symbol_row_imp {
+    use std::cell::RefCell;
+    use gtk::glib;
+    use gtk::glib::subclass::prelude::*;
+    use gtk::prelude::*;
+
+    #[derive(Default, glib::Properties)]
+    #[properties(wrapper_type = super::SymbolTableRowObject)]
+    pub struct SymbolTableRowObject {
+        #[property(get, set)]
+        pub id: RefCell<String>,
+        #[property(get, set)]
+        pub data_type: RefCell<String>,
+        #[property(get, set)]
+        pub memory_position: RefCell<String>,
+        #[property(get, set)]
+        pub lines: RefCell<String>,
+    }
+
+    #[glib::object_subclass]
+    impl ObjectSubclass for SymbolTableRowObject {
+        const NAME: &'static str = "SymbolTableRowObject";
+        type Type = super::SymbolTableRowObject;
+    }
+
+    #[glib::derived_properties]
+    impl ObjectImpl for SymbolTableRowObject {}
+}
+
 gtk::glib::wrapper! {
     pub struct AstNodeObject(ObjectSubclass<imp::AstNodeObject>);
 }
 
+gtk::glib::wrapper! {
+    pub struct SymbolTableRowObject(ObjectSubclass<symbol_row_imp::SymbolTableRowObject>);
+}
+
+impl SymbolTableRowObject {
+    fn new(id: &str, data_type: &str, memory_position: &str, lines: &str) -> Self {
+        gtk::glib::Object::builder()
+            .property("id", id)
+            .property("data-type", data_type)
+            .property("memory-position", memory_position)
+            .property("lines", lines)
+            .build()
+    }
+}
+
 impl AstNodeObject {
-    pub fn new(label: &str, color: &str, line: u32, column: u32, children_model: Option<gio::ListStore>, is_last_child: bool) -> Self {
+    pub fn new(
+        label: &str,
+        color: &str,
+        line: u32,
+        column: u32,
+        children_model: Option<gio::ListStore>,
+        is_last_child: bool,
+        node_type: &str,
+        node_value: &str,
+        node_attribute: &str,
+        node_location: &str,
+    ) -> Self {
         gtk::glib::Object::builder()
             .property("label", label)
             .property("color", color)
@@ -50,13 +117,21 @@ impl AstNodeObject {
             .property("column", column)
             .property("children-model", children_model)
             .property("is-last-child", is_last_child)
+            .property("node-type", node_type)
+            .property("node-value", node_value)
+            .property("node-attribute", node_attribute)
+            .property("node-location", node_location)
             .build()
     }
 }
 
 pub struct AstView {
     pub list_view: ListView,
+    semantic_table: gtk::ColumnView,
+    hash_table: gtk::ColumnView,
     root_store: gio::ListStore,
+    symbol_store: gio::ListStore,
+    location_navigator: Rc<RefCell<Option<Rc<dyn Fn(usize, usize)>>>>,
     is_dark: bool,
 }
 
@@ -74,14 +149,33 @@ impl AstView {
             }
         );
 
-        let selection_model = SingleSelection::new(Some(tree_model));
+        let list_view = Self::create_list_view(tree_model.clone());
+        let location_navigator = Rc::new(RefCell::new(None));
+        let semantic_table =
+            Self::create_semantic_table(tree_model, location_navigator.clone());
+        let symbol_store = gio::ListStore::new::<SymbolTableRowObject>();
+        let hash_table = Self::create_hash_table(symbol_store.clone());
+        list_view.add_css_class("navigation-sidebar");
+        list_view.set_single_click_activate(true);
 
+        let is_dark = LanguageStyle::is_dark_mode();
+        AstView {
+            list_view,
+            semantic_table,
+            hash_table,
+            root_store,
+            symbol_store,
+            location_navigator,
+            is_dark,
+        }
+    }
+
+    fn create_list_view(tree_model: TreeListModel) -> ListView {
+        let selection_model = SingleSelection::new(Some(tree_model));
         let factory = SignalListItemFactory::new();
         factory.connect_setup(move |_, list_item| {
             let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
-
-            // Layout: [prefix_label] [TreeExpander > content_label]
-            let hbox = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+            let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
 
             let prefix_label = Label::new(None);
             prefix_label.set_halign(gtk::Align::Start);
@@ -95,43 +189,218 @@ impl AstView {
             expander.set_indent_for_depth(false);
             expander.set_child(Some(&content_label));
 
-            hbox.append(&prefix_label);
-            hbox.append(&expander);
-
-            list_item.set_child(Some(&hbox));
+            row_box.append(&prefix_label);
+            row_box.append(&expander);
+            list_item.set_child(Some(&row_box));
         });
 
         factory.connect_bind(move |_, list_item| {
             let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
-            let hbox = list_item.child().and_downcast::<gtk::Box>().unwrap();
-
-            // Get widgets: prefix_label is first child, expander is second
-            let prefix_label = hbox.first_child().and_downcast::<Label>().unwrap();
+            let row_box = list_item.child().and_downcast::<gtk::Box>().unwrap();
+            let prefix_label = row_box.first_child().and_downcast::<Label>().unwrap();
             let expander = prefix_label.next_sibling().and_downcast::<TreeExpander>().unwrap();
             let content_label = expander.child().and_downcast::<Label>().unwrap();
-
             let row = list_item.item().and_downcast::<gtk::TreeListRow>().unwrap();
             expander.set_list_row(Some(&row));
 
             let node = row.item().and_downcast::<AstNodeObject>().unwrap();
-
-            // Build tree-line prefix using box-drawing characters
-            let depth = row.depth();
-            let prefix = Self::build_tree_prefix(&row, depth);
-            prefix_label.set_text(&prefix);
-
-            // Set colored content label
+            prefix_label.set_text(&Self::build_tree_prefix(&row, row.depth()));
             let color = node.color();
             let escaped_label = glib::markup_escape_text(&node.label());
-            content_label.set_markup(&format!("<span foreground=\"{}\">{}</span>", color, escaped_label));
+            content_label.set_markup(&format!(
+                "<span foreground=\"{}\">{}</span>",
+                color, escaped_label
+            ));
         });
 
-        let list_view = ListView::new(Some(selection_model), Some(factory));
-        list_view.add_css_class("navigation-sidebar");
-        list_view.set_single_click_activate(true);
+        ListView::new(Some(selection_model), Some(factory))
+    }
 
-        let is_dark = LanguageStyle::is_dark_mode();
-        AstView { list_view, root_store, is_dark }
+    fn create_semantic_table(
+        tree_model: TreeListModel,
+        location_navigator: Rc<RefCell<Option<Rc<dyn Fn(usize, usize)>>>>,
+    ) -> gtk::ColumnView {
+        let selection_model = gtk::NoSelection::new(Some(tree_model));
+        let table = gtk::ColumnView::new(Some(selection_model));
+        table.set_show_column_separators(true);
+        table.set_show_row_separators(true);
+
+        for (index, (title, width)) in [
+            ("Nodo", 450),
+            ("Tipo", 72),
+            ("Valor", 80),
+            ("Atributos (H/S)", 175),
+            ("Fila:Col", 72),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let factory = SignalListItemFactory::new();
+            let setup_navigator = location_navigator.clone();
+            factory.connect_setup(move |_, list_item| {
+                let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
+                if index == 0 {
+                    let row_box = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    let prefix = Label::new(None);
+                    prefix.add_css_class("monospace");
+
+                    let content = Label::new(None);
+                    content.set_halign(gtk::Align::Start);
+                    content.set_ellipsize(gtk::pango::EllipsizeMode::End);
+
+                    let expander = TreeExpander::new();
+                    expander.set_indent_for_depth(false);
+                    expander.set_child(Some(&content));
+                    row_box.append(&prefix);
+                    row_box.append(&expander);
+                    list_item.set_child(Some(&row_box));
+                } else if index == 4 {
+                    let button = gtk::Button::new();
+                    button.add_css_class("flat");
+                    button.add_css_class("link");
+                    button.connect_clicked({
+                        let location_navigator = setup_navigator.clone();
+                        move |button| {
+                            let Some(position) = button.label() else {
+                                return;
+                            };
+                            let Some((line, column)) = position.split_once(':') else {
+                                return;
+                            };
+                            let (Ok(line), Ok(column)) =
+                                (line.parse::<usize>(), column.parse::<usize>())
+                            else {
+                                return;
+                            };
+                            if line == 0 || column == 0 {
+                                return;
+                            }
+                            if let Some(navigate) = location_navigator.borrow().clone() {
+                                navigate(line, column);
+                            }
+                        }
+                    });
+                    button.set_halign(gtk::Align::Start);
+                    list_item.set_child(Some(&button));
+                } else {
+                    let label = Label::new(None);
+                    label.set_halign(gtk::Align::Start);
+                    label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                    label.add_css_class("monospace");
+                    list_item.set_child(Some(&label));
+                }
+            });
+
+            factory.connect_bind(move |_, list_item| {
+                let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
+                let row = list_item.item().and_downcast::<gtk::TreeListRow>().unwrap();
+                let node = row.item().and_downcast::<AstNodeObject>().unwrap();
+
+                if index == 0 {
+                    let row_box = list_item.child().and_downcast::<gtk::Box>().unwrap();
+                    let prefix = row_box.first_child().and_downcast::<Label>().unwrap();
+                    let expander = prefix.next_sibling().and_downcast::<TreeExpander>().unwrap();
+                    let content = expander.child().and_downcast::<Label>().unwrap();
+                    expander.set_list_row(Some(&row));
+                    prefix.set_text(&Self::build_tree_prefix(&row, row.depth()));
+                    content.set_markup(&format!(
+                        "<span foreground=\"{}\">{}</span>",
+                        node.color(),
+                        glib::markup_escape_text(&node.label())
+                    ));
+                } else {
+                    let value = match index {
+                        1 => node.node_type(),
+                        2 => node.node_value(),
+                        3 => node.node_attribute(),
+                        _ => node.node_location(),
+                    };
+                    if index == 4 {
+                        list_item
+                            .child()
+                            .and_downcast::<gtk::Button>()
+                            .unwrap()
+                            .set_label(&value);
+                        return;
+                    }
+                    let label = list_item.child().and_downcast::<Label>().unwrap();
+                    if node.node_type() == "error" && index <= 2 {
+                        label.set_markup(&format!(
+                            "<span foreground=\"#f44747\" weight=\"bold\">{}</span>",
+                            glib::markup_escape_text(&value)
+                        ));
+                    } else {
+                        label.set_text(&value);
+                    }
+                }
+            });
+
+            let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
+            column.set_fixed_width(width);
+            column.set_resizable(false);
+            table.append_column(&column);
+        }
+
+        table
+    }
+
+    fn create_hash_table(symbol_store: gio::ListStore) -> gtk::ColumnView {
+        let selection_model = gtk::NoSelection::new(Some(symbol_store));
+        let table = gtk::ColumnView::new(Some(selection_model));
+        table.set_show_column_separators(true);
+        table.set_show_row_separators(true);
+
+        for (index, (title, width)) in [
+            ("ID", 180),
+            ("Tipo", 100),
+            ("Memoria", 180),
+            ("Líneas", 180),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let factory = SignalListItemFactory::new();
+            factory.connect_setup(move |_, list_item| {
+                let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
+                let label = Label::new(None);
+                label.set_halign(gtk::Align::Start);
+                label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                label.add_css_class("monospace");
+                list_item.set_child(Some(&label));
+            });
+            factory.connect_bind(move |_, list_item| {
+                let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
+                let row = list_item
+                    .item()
+                    .and_downcast::<SymbolTableRowObject>()
+                    .unwrap();
+                let value = match index {
+                    0 => row.id(),
+                    1 => row.data_type(),
+                    2 => row.memory_position(),
+                    _ => row.lines(),
+                };
+                list_item
+                    .child()
+                    .and_downcast::<Label>()
+                    .unwrap()
+                    .set_text(&value);
+            });
+
+            let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
+            column.set_fixed_width(width);
+            column.set_resizable(false);
+            table.append_column(&column);
+        }
+
+        table
+    }
+
+    pub fn set_location_navigator(
+        &self,
+        navigate: impl Fn(usize, usize) + 'static,
+    ) {
+        *self.location_navigator.borrow_mut() = Some(Rc::new(navigate));
     }
 
     /// Build box-drawing prefix like: "│  ├── " or "   └── "
@@ -187,33 +456,218 @@ impl AstView {
             .build()
     }
 
+    pub fn widget_with_attributes(&self) -> gtk::Widget {
+        let tree = ScrolledWindow::builder()
+            .child(&self.semantic_table)
+            .vexpand(true)
+            .hexpand(true)
+            .build();
+        tree.upcast()
+    }
+
+    pub fn widget_hash_table(&self) -> gtk::Widget {
+        ScrolledWindow::builder()
+            .child(&self.hash_table)
+            .vexpand(true)
+            .hexpand(true)
+            .build()
+            .upcast()
+    }
+
     pub fn clear(&self) {
         self.root_store.remove_all();
+        self.symbol_store.remove_all();
+    }
+
+    pub fn populate_symbol_table(&self, symbols: &[Symbol]) {
+        self.symbol_store.remove_all();
+        for symbol in symbols {
+            let lines = symbol
+                .lines
+                .iter()
+                .map(usize::to_string)
+                .collect::<Vec<_>>()
+                .join(", ");
+            self.symbol_store.append(&SymbolTableRowObject::new(
+                &symbol.name,
+                symbol.data_type.as_str(),
+                &symbol.memory_position.to_string(),
+                &lines,
+            ));
+        }
     }
 
     pub fn populate(&self, root: &AstNode) {
         self.clear();
-        let root_obj = self.create_node_object(root, true);
+        let root_obj = self.create_node_object(root, true, None, None, &[]);
         self.root_store.append(&root_obj);
     }
 
-    fn create_node_object(&self, node: &AstNode, is_last_child: bool) -> AstNodeObject {
+    pub fn populate_semantic(
+        &self,
+        root: &AstNode,
+        symbols: &[Symbol],
+        values: &SemanticValueMap,
+        errors: &[SemanticError],
+    ) {
+        self.clear();
+        let root_obj = self.create_node_object(root, true, Some(symbols), Some(values), errors);
+        self.root_store.append(&root_obj);
+    }
+
+    fn create_node_object(
+        &self,
+        node: &AstNode,
+        is_last_child: bool,
+        symbols: Option<&[Symbol]>,
+        values: Option<&SemanticValueMap>,
+        errors: &[SemanticError],
+    ) -> AstNodeObject {
         let color = Self::label_color(&node.label, self.is_dark);
         let line = node.line.unwrap_or(0) as u32;
         let column = node.column.unwrap_or(0) as u32;
+        let has_semantic_error = node.line.zip(node.column).is_some_and(|(line, column)| {
+            errors
+                .iter()
+                .any(|error| error.line == line && error.column == column)
+        });
+        let node_type = if has_semantic_error {
+            "error".to_string()
+        } else {
+            Self::node_type(node, symbols)
+        };
+        let node_value = if has_semantic_error {
+            "?".to_string()
+        } else {
+            Self::node_value(node, symbols, values)
+        };
+        let node_attribute = Self::node_attribute(node, symbols);
+        let node_location = match (node.line, node.column) {
+            (Some(line), Some(column)) => format!("{line}:{column}"),
+            (Some(line), None) => format!("{line}:—"),
+            _ => "—".to_string(),
+        };
 
         let children_store = if !node.children.is_empty() {
             let store = gio::ListStore::new::<AstNodeObject>();
             let last_idx = node.children.len() - 1;
             for (i, child) in node.children.iter().enumerate() {
-                store.append(&self.create_node_object(child, i == last_idx));
+                store.append(&self.create_node_object(
+                    child,
+                    i == last_idx,
+                    symbols,
+                    values,
+                    errors,
+                ));
             }
             Some(store)
         } else {
             None
         };
 
-        AstNodeObject::new(&node.label, &color, line, column, children_store, is_last_child)
+        AstNodeObject::new(
+            &node.label,
+            &color,
+            line,
+            column,
+            children_store,
+            is_last_child,
+            &node_type,
+            &node_value,
+            &node_attribute,
+            &node_location,
+        )
+    }
+
+    fn node_type(node: &AstNode, symbols: Option<&[Symbol]>) -> String {
+        if let Some(annotated_type) = &node.annotated_type {
+            return annotated_type.clone();
+        }
+        let label = node.label.trim();
+        if let Some(declared_type) = label.strip_prefix("type:") {
+            return declared_type.trim().to_string();
+        }
+        if label.starts_with("number:") {
+            return if label.contains('.') { "float" } else { "int" }.to_string();
+        }
+        if label.starts_with("bool:") {
+            return "bool".to_string();
+        }
+        if label.starts_with("string:") {
+            return "string".to_string();
+        }
+        if label == "Assignment" {
+            if let Some(name) = node.children.first().and_then(|child| {
+                child.label.trim().strip_prefix("id: ")
+            }) {
+                return symbols
+                    .and_then(|symbols| symbols.iter().rev().find(|symbol| symbol.name == name))
+                    .map(|symbol| symbol.data_type.as_str().to_string())
+                    .unwrap_or_else(|| "unknown".to_string());
+            }
+        }
+        if let Some(name) = label.strip_prefix("id: ") {
+            return symbols
+                .and_then(|symbols| symbols.iter().rev().find(|symbol| symbol.name == name))
+                .map(|symbol| symbol.data_type.as_str().to_string())
+                .unwrap_or_else(|| "unknown".to_string());
+        }
+        if let Some(symbol) = Self::declared_symbol(node, symbols) {
+            return symbol.data_type.as_str().to_string();
+        }
+        "—".to_string()
+    }
+
+    fn node_value(
+        node: &AstNode,
+        symbols: Option<&[Symbol]>,
+        values: Option<&SemanticValueMap>,
+    ) -> String {
+        if let Some(value) = &node.attributed_value {
+            return value.clone();
+        }
+        if node.label.trim().starts_with("id: ") || Self::declared_symbol(node, symbols).is_some() {
+            return node
+                .line
+                .zip(node.column)
+                .and_then(|location| values?.get(&location))
+                .cloned()
+                .unwrap_or_else(|| "—".to_string());
+        }
+        for prefix in ["id: ", "number:", "bool:", "string:", "type:"] {
+            if let Some(value) = node.label.strip_prefix(prefix) {
+                return value.trim().to_string();
+            }
+        }
+        "—".to_string()
+    }
+
+    fn node_attribute(node: &AstNode, symbols: Option<&[Symbol]>) -> String {
+        if node.label.trim().starts_with("id: ") || Self::declared_symbol(node, symbols).is_some() {
+            "H".to_string()
+        } else {
+            "S".to_string()
+        }
+    }
+
+    fn declared_symbol<'a>(
+        node: &AstNode,
+        symbols: Option<&'a [Symbol]>,
+    ) -> Option<&'a Symbol> {
+        let (line, column) = (node.line?, node.column?);
+        let symbols = symbols?;
+        symbols
+            .iter()
+            .find(|symbol| {
+            symbol.name == node.label.trim()
+                && symbol.line == line
+                && symbol.column == column
+            })
+            .or_else(|| {
+                symbols
+                    .iter()
+                    .find(|symbol| symbol.name == node.label.trim() && symbol.line == line)
+            })
     }
 
     fn label_color(label: &str, is_dark: bool) -> String {
@@ -286,5 +740,55 @@ impl AstView {
                 "#000000".to_string()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AstView;
+    use crate::compiler::semantic::{SemanticType, SemanticValueMap, Symbol};
+    use crate::models::ast::AstNode;
+
+    #[test]
+    fn declaration_identifiers_show_their_symbol_attributes() {
+        let declarations = [
+            ("x", 6, 2, SemanticType::Int, 1),
+            ("y", 9, 2, SemanticType::Int, 2),
+            ("z", 12, 2, SemanticType::Int, 3),
+            ("a", 8, 3, SemanticType::Float, 4),
+            ("b", 11, 3, SemanticType::Float, 5),
+            ("c", 14, 3, SemanticType::Float, 6),
+        ];
+        let symbols = declarations
+            .iter()
+            .map(|(name, column, line, data_type, memory_position)| Symbol {
+                name: (*name).to_string(),
+                data_type: data_type.clone(),
+                line: *line,
+                column: *column,
+                memory_position: *memory_position,
+                lines: vec![*line],
+            })
+            .collect::<Vec<_>>();
+        let values = declarations
+            .iter()
+            .map(|(name, column, line, _, _)| ((*line, *column), format!("value-{name}")))
+            .collect::<SemanticValueMap>();
+
+        for (name, column, line, data_type, _) in declarations {
+            let node = AstNode::new(name).with_pos(line, column);
+            assert_eq!(
+                AstView::node_type(&node, Some(&symbols)),
+                data_type.as_str()
+            );
+            assert_eq!(
+                AstView::node_value(&node, Some(&symbols), Some(&values)),
+                format!("value-{name}")
+            );
+            assert_eq!(AstView::node_attribute(&node, Some(&symbols)), "H");
+        }
+
+        let int_identifier = AstNode::new("x").with_pos(2, 999);
+        assert_eq!(AstView::node_type(&int_identifier, Some(&symbols)), "int");
     }
 }

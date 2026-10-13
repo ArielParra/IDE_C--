@@ -40,7 +40,7 @@ impl MenuBuilder {
 
     pub fn add_build_menu(&mut self) -> &mut Self {
         let menu = gio::Menu::new();
-        menu.append(Some("_Compile"), Some("app.compile1"));
+        menu.append(Some("_Compile"), Some("app.compile-phases"));
         menu.append(Some("_Run"), Some("app.run"));
         menu.append(Some("_Debug"), Some("app.debug"));
         self.model.append_submenu(Some("_Build & Debug"), &menu);
@@ -58,7 +58,7 @@ impl MenuBuilder {
         semantic.append(Some("Run Se_mantic Analysis"), Some("app.semantic"));
 
         let compiler = gio::Menu::new();
-        compiler.append(Some("_Compile"), Some("app.c--compiler"));
+        compiler.append(Some("_Compile"), Some("app.compile-phases"));
         compiler.append(Some("_Lexical Analysis"), Some("app.lexico"));
         compiler.append(Some("_Syntax Analysis"), Some("app.sintactico"));
         compiler.append(Some("Se_mantic Analysis"), Some("app.semantico"));

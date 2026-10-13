@@ -7,7 +7,8 @@ This project now includes a semantic-analysis pass consistent with the language 
 1. Declaration validation
    - variables must be declared before use
    - duplicate declarations in the same scope are rejected
-   - declaration type is stored in the symbol table
+   - the symbol table reports each identifier, its data type, its table position, and the source lines where it appears
+   - the semantic view presents the syntax tree in fixed-width columns for node, type, value, inherited/synthesized attributes, and source line/column; semantic errors are marked on their node rows
 
 2. Type checking
    - assignment compatibility is enforced

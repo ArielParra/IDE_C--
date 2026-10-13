@@ -23,6 +23,8 @@ impl ActionHandlers {
         errors_view: Rc<RefCell<TextView>>,
         syntax_errors_view: Rc<RefCell<TextView>>,
         semantic_errors_view: Rc<RefCell<TextView>>,
+        semantic_view: Rc<RefCell<TextView>>,
+        semantic_ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         debug_notebook: gtk::Notebook,
         errors_notebook: gtk::Notebook,
@@ -41,11 +43,12 @@ impl ActionHandlers {
             errors_view.clone(),
             syntax_errors_view.clone(),
             semantic_errors_view.clone(),
+            semantic_view.clone(),
+            semantic_ast_view.clone(),
             ast_view.clone(),
         );
         Self::register_find_action(app, window, &buffer_clone, &editor_view, search_bar, search_entry);
         Self::register_lexical_action(app, &buffer_clone, lex_view, errors_view, debug_notebook.clone(), errors_notebook.clone(), file_state.clone());
-        Self::register_compile_action(app, window, file_state.clone());
         Self::register_syntax_action(
             app,
             &buffer_clone,
@@ -59,11 +62,15 @@ impl ActionHandlers {
             app,
             &buffer_clone,
             semantic_errors_view,
+            semantic_view,
+            semantic_ast_view,
             ast_view,
             debug_notebook,
             errors_notebook,
-            file_state,
+            file_state.clone(),
         );
+        Self::register_compile_phases_action(app, window);
+        Self::register_compile_action(app, window, file_state.clone());
     }
 
     fn register_file_actions(
@@ -75,6 +82,8 @@ impl ActionHandlers {
         errors_view: Rc<RefCell<TextView>>,
         syntax_errors_view: Rc<RefCell<TextView>>,
         semantic_errors_view: Rc<RefCell<TextView>>,
+        semantic_view: Rc<RefCell<TextView>>,
+        semantic_ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     ) {
         let buffer_clone = buffer.clone();
@@ -84,6 +93,8 @@ impl ActionHandlers {
         let errors_view_clone = errors_view.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
         let semantic_errors_view_clone = semantic_errors_view.clone();
+        let semantic_view_clone = semantic_view.clone();
+        let semantic_ast_view_clone = semantic_ast_view.clone();
         let ast_view_clone = ast_view.clone();
         let window_clone_new = window.clone();
         new_action.connect_activate(move |_, _| {
@@ -95,6 +106,8 @@ impl ActionHandlers {
                 errors_view_clone.clone(),
                 syntax_errors_view_clone.clone(),
                 semantic_errors_view_clone.clone(),
+                semantic_view_clone.clone(),
+                semantic_ast_view_clone.clone(),
                 ast_view_clone.clone(),
             );
         });
@@ -108,6 +121,8 @@ impl ActionHandlers {
         let errors_view_clone = errors_view.clone();
         let syntax_errors_view_clone = syntax_errors_view.clone();
         let semantic_errors_view_clone = semantic_errors_view.clone();
+        let semantic_view_clone = semantic_view.clone();
+        let semantic_ast_view_clone = semantic_ast_view.clone();
         let ast_view_clone2 = ast_view.clone();
         open_action.connect_activate(move |_, _| {
             file_manager::file_ops::flash_action_button(&window_clone, "app.open");
@@ -119,6 +134,8 @@ impl ActionHandlers {
                 errors_view_clone.clone(),
                 syntax_errors_view_clone.clone(),
                 semantic_errors_view_clone.clone(),
+                semantic_view_clone.clone(),
+                semantic_ast_view_clone.clone(),
                 ast_view_clone2.clone(),
             );
         });
@@ -400,6 +417,8 @@ impl ActionHandlers {
         app: &Application,
         buffer: &gtk::TextBuffer,
         semantic_errors_view: Rc<RefCell<TextView>>,
+        semantic_view: Rc<RefCell<TextView>>,
+        semantic_ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
         debug_notebook: gtk::Notebook,
         errors_notebook: gtk::Notebook,
@@ -407,6 +426,8 @@ impl ActionHandlers {
     ) {
         let semantic_action = gio::SimpleAction::new("semantic", None);
         let semantic_errors_view_clone = semantic_errors_view.clone();
+        let semantic_view_clone = semantic_view.clone();
+        let semantic_ast_view_clone = semantic_ast_view.clone();
         let ast_view_clone = ast_view.clone();
         let file_state_clone = file_state.clone();
         let _buffer_clone = buffer.clone();
@@ -417,6 +438,9 @@ impl ActionHandlers {
 
             let err_buffer = semantic_errors_view_clone.borrow().buffer();
             err_buffer.set_text("");
+            let symbol_buffer = semantic_view_clone.borrow().buffer();
+            symbol_buffer.set_text("");
+            semantic_ast_view_clone.borrow().clear();
 
             let tokens_path = match &*file_state_clone.borrow() {
                 Some(p) => {
@@ -430,6 +454,7 @@ impl ActionHandlers {
 
             let tokens = crate::compiler::parser::read_tokens_from_file(&tokens_path);
             if tokens.is_empty() {
+                symbol_buffer.set_text("No symbol table available. Run lexical analysis first.");
                 let error_tag = err_buffer.create_tag(
                     None,
                     &[("foreground", &"#f44747"), ("weight", &700i32)],
@@ -461,7 +486,39 @@ impl ActionHandlers {
                 }
             }
 
-            let semantic_errors = crate::compiler::semantic::SemanticAnalyzer::analyze(&ast);
+            let (semantic_errors, symbols, values) =
+                crate::compiler::semantic::SemanticAnalyzer::analyze_with_symbol_values(&ast);
+            {
+                let semantic_ast = semantic_ast_view_clone.borrow();
+                semantic_ast.populate_semantic(&ast, &symbols, &values, &semantic_errors);
+                semantic_ast.populate_symbol_table(&symbols);
+            }
+            semantic_view_clone.borrow().set_monospace(true);
+
+            let mut symbol_table_output = String::from(
+                "SYMBOL TABLE\nID | Type | Memory (table position) | Lines\n",
+            );
+            if symbols.is_empty() {
+                symbol_table_output.push_str("No symbols declared.\n");
+            } else {
+                for symbol in &symbols {
+                    let lines = symbol
+                        .lines
+                        .iter()
+                        .map(|line| line.to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    symbol_table_output.push_str(&format!(
+                        "{} | {} | {} | {}\n",
+                        symbol.name,
+                        symbol.data_type.as_str(),
+                        symbol.memory_position,
+                        lines
+                    ));
+                }
+            }
+            symbol_buffer.set_text(&symbol_table_output);
+
             let error_link_tag = err_buffer.create_tag(
                 None,
                 &[
@@ -471,7 +528,8 @@ impl ActionHandlers {
             );
 
             if semantic_errors.is_empty() {
-                err_buffer.set_text("No semantic errors detected.");
+                let mut message_iter = err_buffer.end_iter();
+                err_buffer.insert(&mut message_iter, "No semantic errors detected.");
             } else {
                 for error in &semantic_errors {
                     let mut message_iter = err_buffer.end_iter();
@@ -494,16 +552,34 @@ impl ActionHandlers {
         app.add_action(&semantic_action);
     }
 
-    fn register_compile_action(app: &Application, window: &ApplicationWindow, file_state: Rc<RefCell<Option<PathBuf>>>) {
+    fn register_compile_phases_action(app: &Application, window: &ApplicationWindow) {
+        let compile_action = gio::SimpleAction::new("compile-phases", None);
+        let app_clone = app.clone();
+        let window_clone = window.clone();
+
+        compile_action.connect_activate(move |_, _| {
+            file_manager::file_ops::flash_action_button(&window_clone, "app.compile-phases");
+            app_clone.activate_action("lexical", None);
+            app_clone.activate_action("syntax", None);
+            app_clone.activate_action("semantic", None);
+        });
+
+        app.add_action(&compile_action);
+    }
+
+    fn register_compile_action(
+        app: &Application,
+        window: &ApplicationWindow,
+        file_state: Rc<RefCell<Option<PathBuf>>>,
+    ) {
         let compile_action = gio::SimpleAction::new("c--compiler", None);
         let file_state_clone = file_state.clone();
-
         let window_clone_compile = window.clone();
 
         compile_action.connect_activate(move |_, _| {
             file_manager::file_ops::flash_action_button(&window_clone_compile, "app.c--compiler");
             let path = match &*file_state_clone.borrow() {
-                Some(p) => p.clone(),
+                Some(path) => path.clone(),
                 None => {
                     eprintln!("No file selected to compile.");
                     return;
@@ -524,9 +600,9 @@ impl ActionHandlers {
                 .stderr(Stdio::piped())
                 .spawn()
             {
-                Ok(c) => c,
-                Err(e) => {
-                    eprintln!("Failed to start compiler: {}", e);
+                Ok(child) => child,
+                Err(error) => {
+                    eprintln!("Failed to start compiler: {}", error);
                     return;
                 }
             };
@@ -535,8 +611,8 @@ impl ActionHandlers {
                 std::thread::spawn(move || {
                     let reader = std::io::BufReader::new(stdout);
                     for line in reader.lines() {
-                        if let Ok(l) = line {
-                            println!("OUT: {}", l);
+                        if let Ok(line) = line {
+                            println!("OUT: {}", line);
                         }
                     }
                 });
@@ -546,8 +622,8 @@ impl ActionHandlers {
                 std::thread::spawn(move || {
                     let reader = std::io::BufReader::new(stderr);
                     for line in reader.lines() {
-                        if let Ok(l) = line {
-                            eprintln!("ERR: {}", l);
+                        if let Ok(line) = line {
+                            eprintln!("ERR: {}", line);
                         }
                     }
                 });

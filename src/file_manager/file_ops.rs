@@ -15,6 +15,8 @@ pub fn new_file(
     errors_view: Rc<RefCell<TextView>>,
     syntax_errors_view: Rc<RefCell<TextView>>,
     semantic_errors_view: Rc<RefCell<TextView>>,
+    semantic_view: Rc<RefCell<TextView>>,
+    semantic_ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
 ) {
     buffer.set_text("");
@@ -22,6 +24,8 @@ pub fn new_file(
     errors_view.borrow().buffer().set_text("");
     syntax_errors_view.borrow().buffer().set_text("");
     semantic_errors_view.borrow().buffer().set_text("");
+    semantic_view.borrow().buffer().set_text("");
+    semantic_ast_view.borrow().clear();
     ast_view.borrow().clear();
     *current_file.borrow_mut() = None;
 }
@@ -34,6 +38,8 @@ pub fn open_file_dialog(
     errors_view: Rc<RefCell<TextView>>,
     syntax_errors_view: Rc<RefCell<TextView>>,
     semantic_errors_view: Rc<RefCell<TextView>>,
+    semantic_view: Rc<RefCell<TextView>>,
+    semantic_ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
     ast_view: Rc<RefCell<crate::ui::panels::AstView>>,
 ) {
     let dialog = FileDialog::builder().title("Open File").modal(true).build();
@@ -52,6 +58,8 @@ pub fn open_file_dialog(
                             errors_view.borrow().buffer().set_text("");
                             syntax_errors_view.borrow().buffer().set_text("");
                             semantic_errors_view.borrow().buffer().set_text("");
+                            semantic_view.borrow().buffer().set_text("");
+                            semantic_ast_view.borrow().clear();
                             ast_view.borrow().clear();
                             *current_file.borrow_mut() = Some(path);
                         }
