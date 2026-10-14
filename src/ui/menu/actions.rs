@@ -495,19 +495,13 @@ impl ActionHandlers {
             }
             semantic_view_clone.borrow().set_monospace(true);
 
-            let mut symbol_table_output = String::from(
-                "SYMBOL TABLE\nID | Type | Memory (table position) | Lines\n",
-            );
+            let mut symbol_table_output =
+                String::from("SYMBOL TABLE\nID | Tipo | Memoria | Linea\n");
             if symbols.is_empty() {
                 symbol_table_output.push_str("No symbols declared.\n");
             } else {
                 for symbol in &symbols {
-                    let lines = symbol
-                        .lines
-                        .iter()
-                        .map(|line| line.to_string())
-                        .collect::<Vec<_>>()
-                        .join(", ");
+                    let lines = crate::ui::panels::AstView::symbol_line_summary(symbol);
                     symbol_table_output.push_str(&format!(
                         "{} | {} | {} | {}\n",
                         symbol.name,

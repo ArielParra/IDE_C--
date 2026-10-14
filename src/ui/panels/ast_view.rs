@@ -1,7 +1,9 @@
-use gtk::prelude::*;
-use gtk::{gio, glib, Label, ListView, ScrolledWindow, SignalListItemFactory, SingleSelection, TreeExpander, TreeListModel};
 use std::cell::RefCell;
 use std::rc::Rc;
+
+use gtk::prelude::*;
+use gtk::{gio, glib, Label, ListView, ScrolledWindow, SignalListItemFactory, SingleSelection, TreeExpander, TreeListModel};
+
 use crate::models::ast::AstNode;
 use crate::compiler::semantic::{SemanticValueMap, Symbol};
 use crate::models::SemanticError;
@@ -66,6 +68,8 @@ mod symbol_row_imp {
         pub memory_position: RefCell<String>,
         #[property(get, set)]
         pub lines: RefCell<String>,
+        #[property(get, set)]
+        pub line_positions: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -87,12 +91,19 @@ gtk::glib::wrapper! {
 }
 
 impl SymbolTableRowObject {
-    fn new(id: &str, data_type: &str, memory_position: &str, lines: &str) -> Self {
+    fn new(
+        id: &str,
+        data_type: &str,
+        memory_position: &str,
+        lines: &str,
+        line_positions: &str,
+    ) -> Self {
         gtk::glib::Object::builder()
             .property("id", id)
             .property("data-type", data_type)
             .property("memory-position", memory_position)
             .property("lines", lines)
+            .property("line-positions", line_positions)
             .build()
     }
 }
@@ -142,7 +153,7 @@ impl AstView {
         let tree_model = TreeListModel::new(
             root_store.clone(),
             false,
-            true, // autoexpand
+            false,
             |item| {
                 let node = item.downcast_ref::<AstNodeObject>().unwrap();
                 node.children_model().map(|m| m.upcast::<gio::ListModel>())
@@ -154,7 +165,8 @@ impl AstView {
         let semantic_table =
             Self::create_semantic_table(tree_model, location_navigator.clone());
         let symbol_store = gio::ListStore::new::<SymbolTableRowObject>();
-        let hash_table = Self::create_hash_table(symbol_store.clone());
+        let hash_table =
+            Self::create_hash_table(symbol_store.clone(), location_navigator.clone());
         list_view.add_css_class("navigation-sidebar");
         list_view.set_single_click_activate(true);
 
@@ -344,29 +356,42 @@ impl AstView {
         table
     }
 
-    fn create_hash_table(symbol_store: gio::ListStore) -> gtk::ColumnView {
+    fn create_hash_table(
+        symbol_store: gio::ListStore,
+        location_navigator: Rc<RefCell<Option<Rc<dyn Fn(usize, usize)>>>>,
+    ) -> gtk::ColumnView {
         let selection_model = gtk::NoSelection::new(Some(symbol_store));
         let table = gtk::ColumnView::new(Some(selection_model));
         table.set_show_column_separators(true);
         table.set_show_row_separators(true);
+        table.set_hexpand(true);
+        table.set_vexpand(true);
 
-        for (index, (title, width)) in [
-            ("ID", 180),
-            ("Tipo", 100),
-            ("Memoria", 180),
-            ("Líneas", 180),
+        for (index, title) in [
+            "ID",
+            "Tipo",
+            "Memoria",
+            "Linea",
         ]
         .into_iter()
         .enumerate()
         {
             let factory = SignalListItemFactory::new();
+            let setup_navigator = location_navigator.clone();
             factory.connect_setup(move |_, list_item| {
                 let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
-                let label = Label::new(None);
-                label.set_halign(gtk::Align::Start);
-                label.set_ellipsize(gtk::pango::EllipsizeMode::End);
-                label.add_css_class("monospace");
-                list_item.set_child(Some(&label));
+                if index == 3 {
+                    let links = gtk::Box::new(gtk::Orientation::Horizontal, 0);
+                    links.set_hexpand(true);
+                    list_item.set_child(Some(&links));
+                } else {
+                    let label = Label::new(None);
+                    label.set_halign(gtk::Align::Start);
+                    label.set_ellipsize(gtk::pango::EllipsizeMode::End);
+                    label.set_hexpand(true);
+                    label.add_css_class("monospace");
+                    list_item.set_child(Some(&label));
+                }
             });
             factory.connect_bind(move |_, list_item| {
                 let list_item = list_item.downcast_ref::<gtk::ListItem>().unwrap();
@@ -380,20 +405,49 @@ impl AstView {
                     2 => row.memory_position(),
                     _ => row.lines(),
                 };
-                list_item
-                    .child()
-                    .and_downcast::<Label>()
-                    .unwrap()
-                    .set_text(&value);
-            });
+                if index == 3 {
+                    let links = list_item.child().and_downcast::<gtk::Box>().unwrap();
+                    while let Some(child) = links.first_child() {
+                        links.remove(&child);
+                    }
+                    let line_positions = row.line_positions();
+                    for (line, column) in line_positions
+                        .split(';')
+                        .filter_map(Self::parse_line_position)
+                    {
+                        let button = gtk::Button::with_label(&line.to_string());
+                        button.add_css_class("flat");
+                        button.add_css_class("link");
+                        button.add_css_class("hash-line-link");
+                        button.set_margin_start(0);
+                        button.set_margin_end(0);
+                        button.set_halign(gtk::Align::Start);
+                        button.connect_clicked({
+                            let location_navigator = setup_navigator.clone();
+                            move |_| {
+                                if let Some(navigate) = location_navigator.borrow().clone() {
+                                    navigate(line, column);
+                                }
+                            }
+                        });
+                        links.append(&button);
+                    }
+                } else {
+                    list_item
+                        .child()
+                        .and_downcast::<Label>()
+                        .unwrap()
+                        .set_text(&value);
+                }
+        });
 
-            let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
-            column.set_fixed_width(width);
-            column.set_resizable(false);
-            table.append_column(&column);
-        }
+        let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
+        column.set_expand(false);
+        column.set_resizable(false);
+        table.append_column(&column);
+    }
 
-        table
+    table
     }
 
     pub fn set_location_navigator(
@@ -466,12 +520,13 @@ impl AstView {
     }
 
     pub fn widget_hash_table(&self) -> gtk::Widget {
-        ScrolledWindow::builder()
+        let scrolled = ScrolledWindow::builder()
             .child(&self.hash_table)
             .vexpand(true)
             .hexpand(true)
-            .build()
-            .upcast()
+            .build();
+        scrolled.set_policy(gtk::PolicyType::Automatic, gtk::PolicyType::Automatic);
+        scrolled.upcast()
     }
 
     pub fn clear(&self) {
@@ -482,19 +537,51 @@ impl AstView {
     pub fn populate_symbol_table(&self, symbols: &[Symbol]) {
         self.symbol_store.remove_all();
         for symbol in symbols {
-            let lines = symbol
-                .lines
+            let entries = Self::symbol_line_entries(symbol);
+            let lines = Self::line_labels(&entries);
+            let line_positions = entries
                 .iter()
-                .map(usize::to_string)
+                .map(|(line, column)| format!("{line}:{column}"))
                 .collect::<Vec<_>>()
-                .join(", ");
+                .join(";");
             self.symbol_store.append(&SymbolTableRowObject::new(
                 &symbol.name,
                 symbol.data_type.as_str(),
                 &symbol.memory_position.to_string(),
                 &lines,
+                &line_positions,
             ));
         }
+    }
+
+    fn parse_line_position(position: &str) -> Option<(usize, usize)> {
+        let (line, column) = position.split_once(':')?;
+        Some((line.parse().ok()?, column.parse().ok()?))
+    }
+
+    pub fn symbol_line_summary(symbol: &Symbol) -> String {
+        Self::line_labels(&Self::symbol_line_entries(symbol))
+    }
+
+    fn symbol_line_entries(symbol: &Symbol) -> Vec<(usize, usize)> {
+        let mut entries = symbol
+            .appearances
+            .iter()
+            .map(|appearance| (appearance.line, appearance.column))
+            .collect::<Vec<_>>();
+        if entries.is_empty() {
+            entries.extend(symbol.lines.iter().map(|line| (*line, symbol.column)));
+        }
+        entries.sort_unstable();
+        entries
+    }
+
+    fn line_labels(entries: &[(usize, usize)]) -> String {
+        entries
+            .iter()
+            .map(|(line, _)| line.to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     pub fn populate(&self, root: &AstNode) {
@@ -536,11 +623,7 @@ impl AstView {
         } else {
             Self::node_type(node, symbols)
         };
-        let node_value = if has_semantic_error {
-            "?".to_string()
-        } else {
-            Self::node_value(node, symbols, values)
-        };
+        let node_value = Self::node_value(node, symbols, values);
         let node_attribute = Self::node_attribute(node, symbols);
         let node_location = match (node.line, node.column) {
             (Some(line), Some(column)) => format!("{line}:{column}"),
@@ -615,6 +698,47 @@ impl AstView {
         if let Some(symbol) = Self::declared_symbol(node, symbols) {
             return symbol.data_type.as_str().to_string();
         }
+        if label.starts_with("Relational(")
+            || label.starts_with("LogicalAnd")
+            || label.starts_with("LogicalOr")
+            || label == "Not"
+        {
+            return "bool".to_string();
+        }
+        if label.starts_with("AddOp(") || label.starts_with("MulOp(") || label == "Power" {
+            let child_types = node
+                .children
+                .iter()
+                .map(|child| Self::node_type(child, symbols))
+                .collect::<Vec<_>>();
+            if child_types.len() < 2
+                || child_types
+                    .iter()
+                    .any(|type_name| type_name != "int" && type_name != "float")
+            {
+                return "unknown".to_string();
+            }
+            if label.starts_with("MulOp(/)")
+                || child_types.iter().any(|type_name| type_name == "float")
+            {
+                return "float".to_string();
+            }
+            return "int".to_string();
+        }
+        if label.starts_with("Prefix(")
+            || label.starts_with("Postfix(")
+            || label.starts_with("UnaryOp(")
+        {
+            let operand_type = node
+                .children
+                .first()
+                .map(|child| Self::node_type(child, symbols))
+                .unwrap_or_else(|| "unknown".to_string());
+            return match operand_type.as_str() {
+                "int" | "float" => operand_type,
+                _ => "unknown".to_string(),
+            };
+        }
         "—".to_string()
     }
 
@@ -624,6 +748,13 @@ impl AstView {
         values: Option<&SemanticValueMap>,
     ) -> String {
         if let Some(value) = &node.attributed_value {
+            return value.clone();
+        }
+        if let Some(value) = node
+            .line
+            .zip(node.column)
+            .and_then(|location| values?.get(&location))
+        {
             return value.clone();
         }
         if node.label.trim().starts_with("id: ") || Self::declared_symbol(node, symbols).is_some() {
@@ -746,7 +877,7 @@ impl AstView {
 #[cfg(test)]
 mod tests {
     use super::AstView;
-    use crate::compiler::semantic::{SemanticType, SemanticValueMap, Symbol};
+    use crate::compiler::semantic::{SemanticType, SemanticValueMap, Symbol, SymbolAppearance};
     use crate::models::ast::AstNode;
 
     #[test]
@@ -768,6 +899,7 @@ mod tests {
                 column: *column,
                 memory_position: *memory_position,
                 lines: vec![*line],
+                appearances: vec![],
             })
             .collect::<Vec<_>>();
         let values = declarations
@@ -790,5 +922,159 @@ mod tests {
 
         let int_identifier = AstNode::new("x").with_pos(2, 999);
         assert_eq!(AstView::node_type(&int_identifier, Some(&symbols)), "int");
+    }
+
+    #[test]
+    fn arithmetic_parent_nodes_show_their_computed_value() {
+        let node = AstNode::new("AddOp(+)").with_pos(3, 8);
+        let values = [((3, 8), "14".to_string())]
+            .into_iter()
+            .collect::<SemanticValueMap>();
+
+        assert_eq!(AstView::node_value(&node, None, Some(&values)), "14");
+    }
+
+    #[test]
+    fn arithmetic_operator_nodes_show_their_result_type() {
+        let mut multiply = AstNode::new("MulOp(*)");
+        multiply.add_child(AstNode::new("number: 2"));
+        multiply.add_child(AstNode::new("number: 3"));
+
+        let mut add = AstNode::new("AddOp(+)");
+        add.add_child(multiply);
+        add.add_child(AstNode::new("number: 4.5"));
+
+        assert_eq!(AstView::node_type(&add, None), "float");
+        assert_eq!(AstView::node_type(&add.children[0], None), "int");
+    }
+
+    #[test]
+    fn multiplication_and_division_use_the_types_of_their_children() {
+        let symbols = [
+            Symbol {
+                name: "count".to_string(),
+                data_type: SemanticType::Int,
+                line: 1,
+                column: 1,
+                memory_position: 1,
+                lines: vec![1],
+                appearances: vec![],
+            },
+            Symbol {
+                name: "factor".to_string(),
+                data_type: SemanticType::Float,
+                line: 1,
+                column: 8,
+                memory_position: 2,
+                lines: vec![1],
+                appearances: vec![],
+            },
+        ];
+
+        for label in ["MulOp(*)", "MulOp(/)"] {
+            let mut node = AstNode::new(label);
+            node.add_child(AstNode::new("id: count"));
+            node.add_child(AstNode::new("id: factor"));
+            assert_eq!(
+                AstView::node_type(&node, Some(&symbols)),
+                "float",
+                "{label}"
+            );
+        }
+    }
+
+    #[test]
+    fn logical_and_relational_operator_nodes_show_boolean_type() {
+        let mut relational = AstNode::new("Relational(<)");
+        relational.add_child(AstNode::new("number: 2"));
+        relational.add_child(AstNode::new("number: 3"));
+        let mut logical = AstNode::new("LogicalAnd");
+        logical.add_child(relational);
+        logical.add_child(AstNode::new("bool: true"));
+
+        assert_eq!(AstView::node_type(&logical, None), "bool");
+        assert_eq!(AstView::node_type(&logical.children[0], None), "bool");
+    }
+
+    #[test]
+    fn remaining_operator_nodes_show_their_result_types() {
+        for label in ["AddOp(-)", "MulOp(%)", "Power"] {
+            let mut node = AstNode::new(label);
+            node.add_child(AstNode::new("number: 8"));
+            node.add_child(AstNode::new("number: 2"));
+            assert_eq!(AstView::node_type(&node, None), "int", "{label}");
+        }
+
+        let mut integer_division = AstNode::new("MulOp(/)");
+        integer_division.add_child(AstNode::new("number: 5"));
+        integer_division.add_child(AstNode::new("number: 2"));
+        assert_eq!(AstView::node_type(&integer_division, None), "float");
+
+        let mut mixed_add = AstNode::new("AddOp(-)");
+        mixed_add.add_child(AstNode::new("number: 8"));
+        mixed_add.add_child(AstNode::new("number: 2.5"));
+        assert_eq!(AstView::node_type(&mixed_add, None), "float");
+
+        for label in ["LogicalOr", "LogicalAnd", "Relational(>)", "Not"] {
+            let mut node = AstNode::new(label);
+            node.add_child(AstNode::new("bool: true"));
+            if label != "Not" {
+                node.add_child(AstNode::new("bool: false"));
+            }
+            assert_eq!(AstView::node_type(&node, None), "bool", "{label}");
+        }
+
+        for label in ["Prefix(++)", "Postfix(--)", "UnaryOp(++)"] {
+            let mut node = AstNode::new(label);
+            node.add_child(AstNode::new("number: 1.5"));
+            assert_eq!(AstView::node_type(&node, None), "float", "{label}");
+        }
+
+        let mut invalid_unary = AstNode::new("Prefix(++)");
+        invalid_unary.add_child(AstNode::new("bool: true"));
+        assert_eq!(AstView::node_type(&invalid_unary, None), "unknown");
+    }
+
+    #[test]
+    fn symbol_table_repeats_lines_for_each_appearance_without_values() {
+        let symbol = Symbol {
+            name: "x".to_string(),
+            data_type: SemanticType::Int,
+            line: 1,
+            column: 5,
+            memory_position: 1,
+            lines: vec![1, 2, 4],
+            appearances: vec![
+                SymbolAppearance {
+                    line: 1,
+                    column: 5,
+                    value: None,
+                },
+                SymbolAppearance {
+                    line: 2,
+                    column: 3,
+                    value: Some("2".to_string()),
+                },
+                SymbolAppearance {
+                    line: 2,
+                    column: 9,
+                    value: Some("5".to_string()),
+                },
+                SymbolAppearance {
+                    line: 4,
+                    column: 7,
+                    value: Some("8".to_string()),
+                },
+            ],
+        };
+
+        assert_eq!(AstView::symbol_line_summary(&symbol), "1, 2, 2, 4");
+    }
+
+    #[test]
+    fn line_link_target_preserves_column_for_repeated_lines() {
+        assert_eq!(AstView::parse_line_position("2:3"), Some((2, 3)));
+        assert_eq!(AstView::parse_line_position("2:9"), Some((2, 9)));
+        assert_eq!(AstView::parse_line_position("Linea"), None);
     }
 }

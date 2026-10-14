@@ -58,6 +58,13 @@ impl SemanticType {
 }
 
 #[derive(Debug, Clone)]
+pub struct SymbolAppearance {
+    pub line: usize,
+    pub column: usize,
+    pub value: Option<String>,
+}
+
+#[derive(Debug, Clone)]
 pub struct Symbol {
     pub name: String,
     pub data_type: SemanticType,
@@ -65,6 +72,7 @@ pub struct Symbol {
     pub column: usize,
     pub memory_position: usize,
     pub lines: Vec<usize>,
+    pub appearances: Vec<SymbolAppearance>,
 }
 
 pub type SemanticValueMap = HashMap<(usize, usize), String>;
@@ -106,7 +114,13 @@ impl SymbolTable {
         None
     }
 
-    fn record_appearance(&mut self, name: &str, line: usize) {
+    fn record_appearance(
+        &mut self,
+        name: &str,
+        line: usize,
+        column: usize,
+        value: Option<String>,
+    ) {
         let (scopes, symbols) = (&mut self.scopes, &mut self.symbols);
         for scope in scopes.iter_mut().rev() {
             if let Some(symbol) = scope.get_mut(name) {
@@ -115,8 +129,38 @@ impl SymbolTable {
                     symbol.lines.push(line);
                     symbols[memory_position - 1].lines.push(line);
                 }
+                Self::record_symbol_appearance(symbol, line, column, value.clone());
+                Self::record_symbol_appearance(
+                    &mut symbols[memory_position - 1],
+                    line,
+                    column,
+                    value,
+                );
                 return;
             }
+        }
+    }
+
+    fn record_symbol_appearance(
+        symbol: &mut Symbol,
+        line: usize,
+        column: usize,
+        value: Option<String>,
+    ) {
+        if let Some(appearance) = symbol
+            .appearances
+            .iter_mut()
+            .find(|appearance| appearance.line == line && appearance.column == column)
+        {
+            if value.is_some() {
+                appearance.value = value;
+            }
+        } else {
+            symbol.appearances.push(SymbolAppearance {
+                line,
+                column,
+                value,
+            });
         }
     }
 
@@ -143,6 +187,11 @@ impl SymbolTable {
             column,
             memory_position,
             lines: vec![line],
+            appearances: vec![SymbolAppearance {
+                line,
+                column,
+                value: None,
+            }],
         };
         self.current_scope()
             .insert(name.to_string(), symbol.clone());
@@ -174,9 +223,23 @@ impl SemanticAnalyzer {
     ) -> (Vec<SemanticError>, Vec<Symbol>, SemanticValueMap) {
         let mut analyzer = Self::new();
         analyzer.visit_node(ast);
+        let mut symbols = analyzer.symbol_table.symbols().to_vec();
+        for symbol in &mut symbols {
+            if let Some(value) = analyzer.current_values.get(&symbol.memory_position) {
+                analyzer
+                    .value_snapshots
+                    .insert((symbol.line, symbol.column), value.clone());
+                SymbolTable::record_symbol_appearance(
+                    symbol,
+                    symbol.line,
+                    symbol.column,
+                    Some(value.clone()),
+                );
+            }
+        }
         (
             analyzer.errors,
-            analyzer.symbol_table.symbols().to_vec(),
+            symbols,
             analyzer.value_snapshots,
         )
     }
@@ -200,6 +263,8 @@ impl SemanticAnalyzer {
             .symbol_table
             .declare(name, data_type.clone(), line, column)
         {
+            self.symbol_table
+                .record_appearance(name, line, column, None);
             self.errors.push(SemanticError::new(
                 &format!("Variable '{}' is already declared in this scope.", name),
                 line,
@@ -322,8 +387,6 @@ impl SemanticAnalyzer {
                         SemanticType::Unknown
                     }
                 };
-                self.symbol_table
-                    .record_appearance(&target_name, node.line.unwrap_or(0));
                 let expression = node
                     .children
                     .iter()
@@ -335,6 +398,21 @@ impl SemanticAnalyzer {
                 let expr_type = expression
                     .map(|child| self.expression_type_from_node(child))
                     .unwrap_or(SemanticType::Unknown);
+                let target_location = node
+                    .children
+                    .first()
+                    .and_then(|child| child.line.zip(child.column));
+                if let Some((line, column)) = target_location {
+                    self.symbol_table.record_appearance(
+                        &target_name,
+                        line,
+                        column,
+                        assigned_value.clone(),
+                    );
+                    if let Some(value) = &assigned_value {
+                        self.value_snapshots.insert((line, column), value.clone());
+                    }
+                }
 
                 let assignable = self.is_assignable(target_type.clone(), expr_type.clone());
                 if !assignable {
@@ -355,13 +433,7 @@ impl SemanticAnalyzer {
                 {
                     if assignable {
                         if let Some(value) = assigned_value {
-                            self.current_values.insert(memory_position, value.clone());
-                            if let (Some(line), Some(column)) = (
-                                node.children.first().and_then(|child| child.line),
-                                node.children.first().and_then(|child| child.column),
-                            ) {
-                                self.value_snapshots.insert((line, column), value);
-                            }
+                            self.current_values.insert(memory_position, value);
                         } else {
                             self.current_values.remove(&memory_position);
                         }
@@ -534,6 +606,15 @@ impl SemanticAnalyzer {
     }
 
     fn visit_expression(&mut self, node: &AstNode) -> SemanticType {
+        let value = self.evaluate_value(node);
+        let result = self.visit_expression_inner(node);
+        if let (Some(line), Some(column), Some(value)) = (node.line, node.column, value) {
+            self.value_snapshots.insert((line, column), value);
+        }
+        result
+    }
+
+    fn visit_expression_inner(&mut self, node: &AstNode) -> SemanticType {
         if node.label == "Not" {
             let operand = node
                 .children
@@ -610,7 +691,10 @@ impl SemanticAnalyzer {
                 .unwrap_or(SemanticType::Unknown);
 
             let result = if left.is_numeric() && right.is_numeric() {
-                if left == SemanticType::Float || right == SemanticType::Float {
+                if node.label.starts_with("MulOp(/)")
+                    || left == SemanticType::Float
+                    || right == SemanticType::Float
+                {
                     SemanticType::Float
                 } else {
                     SemanticType::Int
@@ -686,12 +770,14 @@ impl SemanticAnalyzer {
     }
 
     fn resolve_variable_type(&mut self, name: &str, line: usize, column: usize) -> SemanticType {
-        self.symbol_table.record_appearance(name, line);
         match self.lookup(name).cloned() {
             Some(symbol) => {
                 self.check_initialized_use(name, line, column);
-                if let Some(value) = self.current_values.get(&symbol.memory_position) {
-                    self.value_snapshots.insert((line, column), value.clone());
+                let value = self.current_values.get(&symbol.memory_position).cloned();
+                self.symbol_table
+                    .record_appearance(name, line, column, value.clone());
+                if let Some(value) = value {
+                    self.value_snapshots.insert((line, column), value);
                 }
                 symbol.data_type
             }
@@ -751,6 +837,11 @@ impl SemanticAnalyzer {
             || label.starts_with("MulOp(")
             || label == "Power"
         {
+            let result_type = if label.starts_with("MulOp(/)") {
+                SemanticType::Float
+            } else {
+                self.numeric_expression_type(node)?
+            };
             let left = left?.parse::<f64>().ok()?;
             let right = right?.parse::<f64>().ok()?;
             let value = if label.starts_with("AddOp(+)") {
@@ -768,9 +859,59 @@ impl SemanticAnalyzer {
             } else {
                 return None;
             };
-            return value.is_finite().then(|| format_numeric_value(value));
+            return value.is_finite().then(|| match result_type {
+                SemanticType::Float => format_float_value(value),
+                _ => format_numeric_value(value),
+            });
         }
 
+        None
+    }
+
+    fn numeric_expression_type(&self, node: &AstNode) -> Option<SemanticType> {
+        let label = node.label.trim();
+        if label == "ExpressionStatement" {
+            return node
+                .children
+                .iter()
+                .find(|child| child.label != "empty")
+                .and_then(|child| self.numeric_expression_type(child));
+        }
+        let literal_type = SemanticType::from_literal(label);
+        if literal_type.is_numeric() {
+            return Some(literal_type);
+        }
+        if let Some(name) = label.strip_prefix("id: ") {
+            let data_type = &self.lookup(name)?.data_type;
+            return data_type.is_numeric().then(|| data_type.clone());
+        }
+        if label.starts_with("Prefix(")
+            || label.starts_with("Postfix(")
+            || label.starts_with("UnaryOp(")
+        {
+            return node
+                .children
+                .first()
+                .and_then(|child| self.numeric_expression_type(child));
+        }
+        if label.starts_with("AddOp(") || label.starts_with("MulOp(") || label == "Power" {
+            let left = node
+                .children
+                .first()
+                .and_then(|child| self.numeric_expression_type(child))?;
+            let right = node
+                .children
+                .get(1)
+                .and_then(|child| self.numeric_expression_type(child))?;
+            return Some(if label.starts_with("MulOp(/)")
+                || left == SemanticType::Float
+                || right == SemanticType::Float
+            {
+                SemanticType::Float
+            } else {
+                SemanticType::Int
+            });
+        }
         None
     }
 
@@ -842,6 +983,15 @@ fn format_numeric_value(value: f64) -> String {
         format!("{value:.0}")
     } else {
         value.to_string()
+    }
+}
+
+fn format_float_value(value: f64) -> String {
+    let formatted = format_numeric_value(value);
+    if formatted.contains('.') {
+        formatted
+    } else {
+        format!("{formatted}.0")
     }
 }
 

@@ -65,6 +65,12 @@ scrollbar slider {
     font-size: 0.9em;
 }
 
+.hash-line-link {
+    min-width: 0;
+    min-height: 0;
+    padding: 0 2px;
+}
+
 textview selection {
     background-color: rgba(60, 120, 200, 0.4);
     color: inherit;
