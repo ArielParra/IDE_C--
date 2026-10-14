@@ -691,10 +691,7 @@ impl SemanticAnalyzer {
                 .unwrap_or(SemanticType::Unknown);
 
             let result = if left.is_numeric() && right.is_numeric() {
-                if node.label.starts_with("MulOp(/)")
-                    || left == SemanticType::Float
-                    || right == SemanticType::Float
-                {
+                if left == SemanticType::Float || right == SemanticType::Float {
                     SemanticType::Float
                 } else {
                     SemanticType::Int
@@ -837,11 +834,7 @@ impl SemanticAnalyzer {
             || label.starts_with("MulOp(")
             || label == "Power"
         {
-            let result_type = if label.starts_with("MulOp(/)") {
-                SemanticType::Float
-            } else {
-                self.numeric_expression_type(node)?
-            };
+            let result_type = self.numeric_expression_type(node)?;
             let left = left?.parse::<f64>().ok()?;
             let right = right?.parse::<f64>().ok()?;
             let value = if label.starts_with("AddOp(+)") {
@@ -858,6 +851,11 @@ impl SemanticAnalyzer {
                 left.powf(right)
             } else {
                 return None;
+            };
+            let value = if label.starts_with("MulOp(/)") && result_type == SemanticType::Int {
+                value.trunc()
+            } else {
+                value
             };
             return value.is_finite().then(|| match result_type {
                 SemanticType::Float => format_float_value(value),
@@ -903,10 +901,7 @@ impl SemanticAnalyzer {
                 .children
                 .get(1)
                 .and_then(|child| self.numeric_expression_type(child))?;
-            return Some(if label.starts_with("MulOp(/)")
-                || left == SemanticType::Float
-                || right == SemanticType::Float
-            {
+            return Some(if left == SemanticType::Float || right == SemanticType::Float {
                 SemanticType::Float
             } else {
                 SemanticType::Int

@@ -718,9 +718,7 @@ impl AstView {
             {
                 return "unknown".to_string();
             }
-            if label.starts_with("MulOp(/)")
-                || child_types.iter().any(|type_name| type_name == "float")
-            {
+            if child_types.iter().any(|type_name| type_name == "float") {
                 return "float".to_string();
             }
             return "int".to_string();
@@ -1008,7 +1006,12 @@ mod tests {
         let mut integer_division = AstNode::new("MulOp(/)");
         integer_division.add_child(AstNode::new("number: 5"));
         integer_division.add_child(AstNode::new("number: 2"));
-        assert_eq!(AstView::node_type(&integer_division, None), "float");
+        assert_eq!(AstView::node_type(&integer_division, None), "int");
+
+        let mut mixed_division = AstNode::new("MulOp(/)");
+        mixed_division.add_child(AstNode::new("number: 5"));
+        mixed_division.add_child(AstNode::new("number: 2.0"));
+        assert_eq!(AstView::node_type(&mixed_division, None), "float");
 
         let mut mixed_add = AstNode::new("AddOp(-)");
         mixed_add.add_child(AstNode::new("number: 8"));

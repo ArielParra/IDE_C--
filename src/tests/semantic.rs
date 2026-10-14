@@ -191,8 +191,8 @@ fn test_multiplication_and_division_take_the_types_of_their_operands() {
 }
 
 #[test]
-fn test_division_of_integers_produces_a_float_result() {
-    let code = "main { int numerator; int denominator; float quotient; numerator = 5; denominator = 2; quotient = numerator / denominator; }";
+fn test_integer_division_truncates_and_mixed_division_produces_float() {
+    let code = "main { int numerator; int denominator; int integer_quotient; float decimal_denominator; float float_quotient; numerator = 5; denominator = 2; integer_quotient = numerator / denominator; decimal_denominator = 2.0; float_quotient = numerator / decimal_denominator; }";
     let (tokens, lex_errors) = analyze(code);
     assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
 
@@ -214,21 +214,32 @@ fn test_division_of_integers_produces_a_float_result() {
             .find_map(|child| find_node(child, label))
     }
 
-    let division = find_node(&ast, "MulOp(/)").expect("expected division AST node");
+    let division = find_node(&ast, "MulOp(/)").expect("expected integer division AST node");
     let division_location = (division.line.unwrap(), division.column.unwrap());
     assert_eq!(
         values.get(&division_location).map(String::as_str),
-        Some("2.5"),
-        "the division node should retain its fractional result"
+        Some("2"),
+        "integer division should truncate toward zero"
     );
 
-    let quotient = symbols
+    let integer_quotient = symbols
         .iter()
-        .find(|symbol| symbol.name == "quotient")
-        .expect("expected quotient variable");
+        .find(|symbol| symbol.name == "integer_quotient")
+        .expect("expected integer quotient variable");
     assert_eq!(
         values
-            .get(&(quotient.line, quotient.column))
+            .get(&(integer_quotient.line, integer_quotient.column))
+            .map(String::as_str),
+        Some("2")
+    );
+
+    let float_quotient = symbols
+        .iter()
+        .find(|symbol| symbol.name == "float_quotient")
+        .expect("expected float quotient variable");
+    assert_eq!(
+        values
+            .get(&(float_quotient.line, float_quotient.column))
             .map(String::as_str),
         Some("2.5")
     );
