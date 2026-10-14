@@ -224,8 +224,6 @@ impl AstView {
         let table = gtk::ColumnView::new(Some(selection_model));
         table.set_show_column_separators(true);
         table.set_show_row_separators(true);
-        table.set_hexpand(true);
-        table.set_vexpand(true);
 
         for (index, (title, width)) in [
             ("Nodo", 450),
@@ -338,9 +336,8 @@ impl AstView {
             });
 
             let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
-            column.set_fixed_width(width as i32);
-            column.set_resizable(true);
-            column.set_expand(index == 0 || index == 3);
+            column.set_fixed_width(width);
+            column.set_resizable(false);
             table.append_column(&column);
         }
 
@@ -352,8 +349,6 @@ impl AstView {
         let table = gtk::ColumnView::new(Some(selection_model));
         table.set_show_column_separators(true);
         table.set_show_row_separators(true);
-        table.set_hexpand(true);
-        table.set_vexpand(true);
 
         for (index, (title, width)) in [
             ("ID", 180),
@@ -393,9 +388,8 @@ impl AstView {
             });
 
             let column = gtk::ColumnViewColumn::new(Some(title), Some(factory));
-            column.set_fixed_width(width as i32);
-            column.set_resizable(true);
-            column.set_expand(index == 0);
+            column.set_fixed_width(width);
+            column.set_resizable(false);
             table.append_column(&column);
         }
 
