@@ -153,7 +153,7 @@ impl AstView {
         let tree_model = TreeListModel::new(
             root_store.clone(),
             false,
-            false,
+            true,
             |item| {
                 let node = item.downcast_ref::<AstNodeObject>().unwrap();
                 node.children_model().map(|m| m.upcast::<gio::ListModel>())
