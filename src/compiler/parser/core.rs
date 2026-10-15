@@ -106,8 +106,9 @@ impl<'a> Parser<'a> {
     }
 
     pub(crate) fn can_start_statement(&self) -> bool {
-        matches!(self.current().map(|t| t.token_type.as_str()),
-            Some("IF") | Some("WHILE") | Some("DO") | Some("CIN") | Some("COUT") | Some("ID") | Some("INT_T") | Some("FLOAT_T") | Some("BOOL_T")
+        matches!(self.current(), Some(token) if
+            matches!(token.token_type.as_str(), "IF" | "WHILE" | "DO" | "CIN" | "COUT" | "ID" | "INT_T" | "FLOAT_T" | "BOOL_T")
+                || (token.token_type == "OP" && matches!(token.lexeme.as_str(), "++" | "--"))
         )
     }
 

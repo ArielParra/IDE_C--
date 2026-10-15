@@ -22,6 +22,7 @@ This project now includes a semantic-analysis pass consistent with the language 
 4. Arithmetic validation
    - arithmetic operators require numeric operands
    - mixed int/float expressions are allowed with float result
+   - prefix and postfix `++`/`--` require a numeric variable and update its tracked value
 
 5. Relational and logical validation
    - relational operators require comparable values

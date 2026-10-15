@@ -18,6 +18,9 @@ impl Parser<'_> {
             Some("COUT") => self.parse_output().with_opt_pos(line, column),
             Some("INT_T") | Some("FLOAT_T") | Some("BOOL_T") => self.parse_variable_declaration().with_opt_pos(line, column),
             Some("ID") => self.parse_id_statement().with_opt_pos(line, column),
+            Some("OP") if self.check_lexeme("OP", "++") || self.check_lexeme("OP", "--") => {
+                self.parse_sent_expression().with_opt_pos(line, column)
+            }
             Some(_token_type) => {
                 let (line_val, column_val, found) = self.location_details();
                 self.errors.push(SyntaxError::new(

@@ -81,3 +81,19 @@ fn test_do_until_with_braces() {
     let (_, syn_errors) = build_ast_from_tokens(&tokens);
     assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
 }
+
+#[test]
+fn test_prefix_increment_is_an_expression_statement_and_works_in_blocks() {
+    let code = "main { int x; x = 0; ++x; x = ++x; while (x < 3) { ++x; } }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+
+    fn contains_prefix_increment(node: &crate::models::ast::AstNode) -> bool {
+        node.label == "Prefix(++)" || node.children.iter().any(contains_prefix_increment)
+    }
+
+    assert!(contains_prefix_increment(&ast), "Expected a Prefix(++) AST node");
+}

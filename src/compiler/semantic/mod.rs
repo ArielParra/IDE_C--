@@ -731,12 +731,13 @@ impl SemanticAnalyzer {
                 .first()
                 .map(|child| self.visit_node(child))
                 .unwrap_or(SemanticType::Unknown);
-            if !operand.is_numeric() {
+            if !operand.is_numeric() || target.is_none() {
                 self.errors.push(SemanticError::new(
-                    "Increment and decrement operators require numeric variables.",
+                    "Increment and decrement operators require a numeric variable.",
                     node.line.unwrap_or(0),
                     node.column.unwrap_or(0),
                 ));
+                return operand;
             }
             if let Some(target) = target {
                 if let Some(memory_position) =

@@ -16,6 +16,36 @@ fn test_semantic_analysis_accepts_valid_program() {
 }
 
 #[test]
+fn test_prefix_increment_updates_variable_in_expression_and_statement_workflows() {
+    let code = "main {\n int a;\n int b;\n a = 4;\n b = ++a;\n ++a;\n b = a;\n}";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+
+    let (errors, _, values) = SemanticAnalyzer::analyze_with_symbol_values(&ast);
+    assert!(errors.is_empty(), "Expected no semantic errors: {:?}", errors);
+    assert_eq!(values.get(&(5, 2)).map(String::as_str), Some("5"));
+    assert_eq!(values.get(&(6, 2)).map(String::as_str), Some("6"));
+    assert_eq!(values.get(&(7, 2)).map(String::as_str), Some("6"));
+}
+
+#[test]
+fn test_increment_requires_a_numeric_variable() {
+    let code = "main { int x; x = 1; ++2; }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syn_errors) = build_ast_from_tokens(&tokens);
+    assert!(syn_errors.is_empty(), "Expected no syntax errors: {:?}", syn_errors);
+
+    let errors = SemanticAnalyzer::analyze(&ast);
+    assert!(errors.iter().any(|error| error.message.contains("require a numeric variable")),
+        "Expected an increment lvalue error, got: {:?}", errors);
+}
+
+#[test]
 fn test_semantic_analysis_collects_symbol_table_positions_and_appearance_lines() {
     let code = "main {\n int x;\n x = 1;\n if (true) { int y; y = x; }\n x = x + 1;\n}";
     let (tokens, lex_errors) = analyze(code);

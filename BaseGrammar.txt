@@ -41,7 +41,7 @@ relational → simple_expression [ rel_op simple_expression ]
 rel_op → < | <= | > | >= | == | !=
 
 simple_expression → simple_expression add_op term | term
-add_op → + | - | ++ | --
+add_op → + | -
 
 term → term mul_op factor | factor
 mul_op → * | / | %

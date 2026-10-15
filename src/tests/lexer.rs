@@ -58,3 +58,15 @@ fn test_real_and_until_alias_tokens() {
     assert!(tokens.iter().any(|token| token.token_type == "FLOAT_T" && token.lexeme == "real"));
     assert!(tokens.iter().any(|token| token.token_type == "UNTIL" && token.lexeme == "until"));
 }
+
+#[test]
+fn test_increment_operator_token() {
+    let (tokens, errors) = analyze("++a; a++; --a;");
+    assert!(errors.is_empty(), "Expected no errors: {:?}", errors);
+    let increments = tokens
+        .iter()
+        .filter(|token| token.token_type == "OP" && matches!(token.lexeme.as_str(), "++" | "--"))
+        .map(|token| token.lexeme.as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(increments, vec!["++", "++", "--"]);
+}
