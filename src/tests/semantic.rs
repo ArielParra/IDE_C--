@@ -414,3 +414,125 @@ fn test_semantic_analysis_detects_expected_errors_from_semantic_file() {
     assert!(joined.contains("not declared") || joined.contains("undeclared") || joined.contains("is not declared"), "Missing undeclared variable report: {:?}", messages);
     assert!(joined.contains("Cannot assign") || joined.contains("type") || joined.contains("initializ"), "Missing type or initialization report: {:?}", messages);
 }
+
+#[test]
+fn test_semantic_analysis_shows_evaluated_if_condition_values() {
+    let code = "main { int x; bool ready; x = 3; ready = true; if (x != 2) {} if (ready && x > 1) {} if (!ready) {} }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syntax_errors) = build_ast_from_tokens(&tokens);
+    assert!(syntax_errors.is_empty(), "Expected no syntax errors: {:?}", syntax_errors);
+
+    let (errors, _, values) = SemanticAnalyzer::analyze_with_symbol_values(&ast);
+    assert!(errors.is_empty(), "Expected no semantic errors: {:?}", errors);
+
+    fn collect_selections<'a>(
+        node: &'a crate::models::ast::AstNode,
+        selections: &mut Vec<&'a crate::models::ast::AstNode>,
+    ) {
+        if node.label == "Selection" {
+            selections.push(node);
+        }
+        for child in &node.children {
+            collect_selections(child, selections);
+        }
+    }
+
+    let mut selections = Vec::new();
+    collect_selections(&ast, &mut selections);
+    assert_eq!(selections.len(), 3);
+
+    let condition_values = selections
+        .iter()
+        .map(|selection| {
+            let location = (selection.line.unwrap(), selection.column.unwrap());
+            values.get(&location).map(String::as_str)
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(condition_values, vec![Some("true"), Some("true"), Some("false")]);
+}
+
+#[test]
+fn test_semantic_analysis_propagates_values_to_expression_roots() {
+    let code = "main { int y; y = ((2 + 3) * 4 - 6) / 2 % 5 ^ 2; if (y > 6 && !(y == 7) || false) {} }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syntax_errors) = build_ast_from_tokens(&tokens);
+    assert!(syntax_errors.is_empty(), "Expected no syntax errors: {:?}", syntax_errors);
+
+    let (errors, _, values) = SemanticAnalyzer::analyze_with_symbol_values(&ast);
+    assert!(errors.is_empty(), "Expected no semantic errors: {:?}", errors);
+
+    fn collect_nodes<'a>(
+        node: &'a crate::models::ast::AstNode,
+        nodes: &mut Vec<&'a crate::models::ast::AstNode>,
+    ) {
+        nodes.push(node);
+        for child in &node.children {
+            collect_nodes(child, nodes);
+        }
+    }
+
+    let mut nodes = Vec::new();
+    collect_nodes(&ast, &mut nodes);
+    let value_at = |node: &crate::models::ast::AstNode| {
+        values
+            .get(&(node.line.unwrap(), node.column.unwrap()))
+            .map(String::as_str)
+    };
+
+    for (label, expected) in [
+        ("AddOp(+)", "5"),
+        ("MulOp(*)", "20"),
+        ("AddOp(-)", "14"),
+        ("MulOp(/)", "7"),
+        ("MulOp(%)", "7"),
+        ("Power", "25"),
+        ("Relational(>)", "true"),
+        ("Relational(==)", "true"),
+        ("Not", "false"),
+        ("LogicalAnd", "false"),
+        ("LogicalOr", "false"),
+    ] {
+        let node = nodes
+            .iter()
+            .find(|node| node.label == label)
+            .unwrap_or_else(|| panic!("expected AST node {label}"));
+        assert_eq!(value_at(node), Some(expected), "wrong value on {label}");
+    }
+
+    let expression_root = nodes
+        .iter()
+        .find(|node| node.label == "ExpressionStatement")
+        .expect("expected assignment expression wrapper");
+    assert_eq!(value_at(expression_root), Some("7"));
+}
+
+#[test]
+fn test_semantic_analysis_distinguishes_prefix_and_postfix_values() {
+    let code = "main { int x; int y; int z; x = 2; y = x++; z = ++x; }";
+    let (tokens, lex_errors) = analyze(code);
+    assert!(lex_errors.is_empty(), "Expected no lexical errors: {:?}", lex_errors);
+
+    let (ast, syntax_errors) = build_ast_from_tokens(&tokens);
+    assert!(syntax_errors.is_empty(), "Expected no syntax errors: {:?}", syntax_errors);
+
+    let (errors, symbols, values) = SemanticAnalyzer::analyze_with_symbol_values(&ast);
+    assert!(errors.is_empty(), "Expected no semantic errors: {:?}", errors);
+
+    for (name, expected) in [("x", "4"), ("y", "2"), ("z", "4")] {
+        let symbol = symbols
+            .iter()
+            .find(|symbol| symbol.name == name)
+            .expect("expected variable in symbol table");
+        assert_eq!(
+            values
+                .get(&(symbol.line, symbol.column))
+                .map(String::as_str),
+            Some(expected),
+            "incorrect final value for {name}"
+        );
+    }
+}

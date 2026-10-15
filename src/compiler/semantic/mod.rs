@@ -455,6 +455,9 @@ impl SemanticAnalyzer {
                 result
             }
             "Selection" => {
+                let condition_node = node.children.get(1);
+                let condition_value = condition_node
+                    .and_then(|child| self.evaluate_value(child));
                 let condition = node
                     .children
                     .get(1)
@@ -466,6 +469,11 @@ impl SemanticAnalyzer {
                         node.line.unwrap_or(0),
                         node.column.unwrap_or(0),
                     ));
+                }
+                if let (Some(line), Some(column), Some(value)) =
+                    (node.line, node.column, condition_value)
+                {
+                    self.value_snapshots.insert((line, column), value);
                 }
 
                 let values_before = self.current_values.clone();
@@ -712,7 +720,7 @@ impl SemanticAnalyzer {
             || node.label.starts_with("Postfix(")
             || node.label.starts_with("UnaryOp(")
         {
-            let updated_value = self.evaluate_value(node);
+            let updated_value = self.incremented_value(node);
             let target = node
                 .children
                 .first()
@@ -813,20 +821,62 @@ impl SemanticAnalyzer {
         }
 
         let left = node.children.first().and_then(|child| self.evaluate_value(child));
-        if label.starts_with("Prefix(")
-            || label.starts_with("Postfix(")
-            || label.starts_with("UnaryOp(")
+        if label == "Not" {
+            return Some((!left?.parse::<bool>().ok()?).to_string());
+        }
+        if label.starts_with("LogicalAnd") || label.starts_with("LogicalOr") {
+            let left = left?.parse::<bool>().ok()?;
+            let right = node
+                .children
+                .get(1)
+                .and_then(|child| self.evaluate_value(child))?
+                .parse::<bool>()
+                .ok()?;
+            return Some(
+                (if label.starts_with("LogicalAnd") {
+                    left && right
+                } else {
+                    left || right
+                })
+                .to_string(),
+            );
+        }
+        if let Some(operator) = label
+            .strip_prefix("Relational(")
+            .and_then(|operator| operator.strip_suffix(')'))
         {
-            let current = left?;
-            let number = current.parse::<f64>().ok()?;
-            let updated = if label.contains("++") {
-                number + 1.0
-            } else if label.contains("--") {
-                number - 1.0
-            } else {
-                return Some(current);
+            let left = left?;
+            let right = node
+                .children
+                .get(1)
+                .and_then(|child| self.evaluate_value(child))?;
+            let result = match (left.parse::<f64>(), right.parse::<f64>()) {
+                (Ok(left), Ok(right)) => match operator {
+                    "<" => left < right,
+                    "<=" => left <= right,
+                    ">" => left > right,
+                    ">=" => left >= right,
+                    "==" => left == right,
+                    "!=" => left != right,
+                    _ => return None,
+                },
+                _ => match (left.parse::<bool>(), right.parse::<bool>()) {
+                    (Ok(left), Ok(right)) => match operator {
+                        "==" => left == right,
+                        "!=" => left != right,
+                        _ => return None,
+                    },
+                    _ => return None,
+                },
             };
-            return Some(format_numeric_value(updated));
+            return Some(result.to_string());
+        }
+        if label.starts_with("Prefix(")
+        {
+            return self.incremented_value(node);
+        }
+        if label.starts_with("Postfix(") || label.starts_with("UnaryOp(") {
+            return left;
         }
 
         let right = node.children.get(1).and_then(|child| self.evaluate_value(child));
@@ -864,6 +914,22 @@ impl SemanticAnalyzer {
         }
 
         None
+    }
+
+    fn incremented_value(&self, node: &AstNode) -> Option<String> {
+        let current = node
+            .children
+            .first()
+            .and_then(|child| self.evaluate_value(child))?;
+        let number = current.parse::<f64>().ok()?;
+        let updated = if node.label.contains("++") {
+            number + 1.0
+        } else if node.label.contains("--") {
+            number - 1.0
+        } else {
+            return None;
+        };
+        Some(format_numeric_value(updated))
     }
 
     fn numeric_expression_type(&self, node: &AstNode) -> Option<SemanticType> {
@@ -921,9 +987,11 @@ impl SemanticAnalyzer {
 
     fn expression_type_from_node(&mut self, node: &AstNode) -> SemanticType {
         if node.label == "ExpressionStatement" {
-            for child in &node.children {
-                if child.label == "empty" {
-                    continue;
+            if let Some(child) = node.children.iter().find(|child| child.label != "empty") {
+                if let (Some(line), Some(column), Some(value)) =
+                    (node.line, node.column, self.evaluate_value(child))
+                {
+                    self.value_snapshots.insert((line, column), value);
                 }
                 return self.expression_type_from_node(child);
             }
