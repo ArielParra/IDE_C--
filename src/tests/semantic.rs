@@ -565,4 +565,24 @@ fn test_semantic_analysis_distinguishes_prefix_and_postfix_values() {
             "incorrect final value for {name}"
         );
     }
+
+    fn find_node<'a>(
+        node: &'a crate::models::ast::AstNode,
+        label: &str,
+    ) -> Option<&'a crate::models::ast::AstNode> {
+        if node.label == label {
+            return Some(node);
+        }
+        node.children
+            .iter()
+            .find_map(|child| find_node(child, label))
+    }
+
+    let postfix = find_node(&ast, "Postfix(++)").expect("expected postfix increment node");
+    let postfix_location = (postfix.line.unwrap(), postfix.column.unwrap());
+    assert_eq!(
+        values.get(&postfix_location).map(String::as_str),
+        Some("3"),
+        "the semantic table should show the updated value for x++"
+    );
 }

@@ -614,7 +614,13 @@ impl SemanticAnalyzer {
     }
 
     fn visit_expression(&mut self, node: &AstNode) -> SemanticType {
-        let value = self.evaluate_value(node);
+        // The postfix expression still evaluates to the old value, but its
+        // semantic-table annotation should show the value after the update.
+        let value = if node.label.starts_with("Postfix(") {
+            self.incremented_value(node)
+        } else {
+            self.evaluate_value(node)
+        };
         let result = self.visit_expression_inner(node);
         if let (Some(line), Some(column), Some(value)) = (node.line, node.column, value) {
             self.value_snapshots.insert((line, column), value);
