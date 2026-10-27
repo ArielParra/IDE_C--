@@ -58,7 +58,7 @@ export PKG_CONFIG_x86_64_unknown_linux_gnu="pkg-config"
 export PKG_CONFIG_PATH_x86_64_unknown_linux_gnu="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
 export PKG_CONFIG_SYSROOT_DIR_x86_64_unknown_linux_gnu="/"
 
-cargo build --release
+cargo build --locked --release
 mkdir -p /tmp/output/src
 cp target/${CARGO_BUILD_TARGET}/release/IDE_C--.exe /tmp/output/
 cp -r src/resources /tmp/output/src/

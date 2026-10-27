@@ -10,7 +10,7 @@ FROM debian:trixie-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential pkg-config curl ca-certificates \
-    libgtk-4-dev libgtksourceview-5-dev \
+    libgtk-4-dev libgtksourceview-5-dev xvfb xauth dbus-x11 xdotool fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
@@ -25,7 +25,10 @@ RUN cat > /usr/local/bin/build-linux << 'SH'
 set -e
 
 echo "Building Linux binary..."
-cargo build --release --target-dir=/tmp/target
+cargo test --locked --target-dir=/tmp/target
+xvfb-run -a cargo test --locked --target-dir=/tmp/target gtk_semantic_views -- --ignored --test-threads=1
+cargo build --locked --release --target-dir=/tmp/target
+xvfb-run -a bash scripts/smoke-linux.sh /tmp/target/release/IDE_C--
 
 mkdir -p /build/target/release
 cp /tmp/target/release/IDE_C-- /build/target/release/IDE_C--

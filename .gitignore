@@ -42,3 +42,12 @@ IDE_C--_windows_msys2.zip
 # Logs
 *.log
 *.tokens
+# Release staging and packaging output
+/releases/
+/release-artifacts/
+/AppDir/
+*.AppImage
+
+__pycache__/
+/downloaded/
+/published/

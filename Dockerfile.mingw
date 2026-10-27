@@ -73,7 +73,7 @@ RUN cat > /usr/local/bin/build-windows << 'SH'
 #!/bin/sh
 set -e
 
-cargo build --release --target x86_64-pc-windows-gnu
+cargo build --locked --release --target x86_64-pc-windows-gnu
 mkdir -p /tmp/output/src
 cp target/x86_64-pc-windows-gnu/release/IDE_C--.exe /tmp/output/
 cp -r src/resources /tmp/output/src/
