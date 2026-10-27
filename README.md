@@ -1,5 +1,7 @@
 # IDE C--
 
+**Version 1.3.0 — Semantic Analyzer** · [Release notes](docs/releases/1.3.md)
+
 A modern, cross-platform **Integrated Development Environment** for the **C--** programming language, built with [Rust](https://www.rust-lang.org/) and [GTK4](https://gtk.org/) via [gtk-rs](https://gtk-rs.org/).
 
 ---
@@ -9,9 +11,11 @@ A modern, cross-platform **Integrated Development Environment** for the **C--** 
 - **Source Code Editor** — Powered by [GtkSourceView5](https://wiki.gnome.org/Projects/GtkSourceView) with syntax highlighting, line numbers, and auto-indentation.
 - **Lexical Analysis** — Tokenizes C-- source code, displays colored token output, and reports lexical errors with clickable line/column navigation.
 - **Syntax Analysis** — Builds an Abstract Syntax Tree (AST) from tokens and renders it as an interactive, expandable tree with Unicode box-drawing connectors (`├──`, `└──`, `│`).
+- **Semantic Analysis** — Analyze the current editor text, including unsaved changes, without a saved token file. Inspect a separately annotated AST with types, constant values and numeric conversions.
+- **Symbol Table** — Display declarations, scopes, reference positions and logical storage offsets from the actual analyzer, with navigation and copying.
 - **Error Navigation** — Click on any error or AST node to jump directly to the corresponding line and column in the editor.
-- **Token Persistence** — Tokens are saved per-file (`*.c--.tokens`), allowing syntax analysis to be run independently.
-- **Cross-Platform** — Runs on Linux, Windows (via MSYS2), and macOS.
+- **Token Persistence** — The lexical action saves `*.c--.tokens` as an export. Syntax and Semantic Analysis refresh the analysis directly from the current buffer; editing clears prior results.
+- **Cross-Platform** — Release binaries for x86-64 Linux and Windows (MSYS2 and MinGW); native macOS source builds remain available.
 
 ## Architecture
 
@@ -21,7 +25,9 @@ src/
 ├── styles.css               # GTK4 custom theme overrides
 ├── compiler/
 │   ├── lexer/               # Lexical analyzer (tokenizer, handlers, errors)
-│   └── parser/              # Syntax analyzer (core, expressions, statements)
+│   ├── parser/              # Syntax analyzer (core, expressions, statements)
+│   ├── semantic/            # Annotated AST, symbol registry, types and constants
+│   └── analysis.rs          # Current-buffer pipeline for all three phases
 ├── models/
 │   └── ast.rs               # AST data structure
 ├── file_manager/
@@ -32,9 +38,11 @@ src/
     ├── headerbar/            # Menu bar
     ├── menu/
     │   ├── actions.rs        # GIO action handlers (lexical, syntax, compile)
+    │   ├── semantic_action.rs # Current-buffer analysis and diagnostics
     │   └── navigator.rs      # Click-to-code navigation
     └── panels/
         ├── ast_view.rs       # AST tree (GObject + ListView + TreeListModel)
+        ├── symbols_view.rs   # Symbol table with navigation and copying
         ├── notebook.rs       # Tab panels
         └── layout.rs         # Panel layout
 ```
@@ -101,7 +109,7 @@ cargo run
 To create an optimized release build:
 
 ```sh
-cargo build --release
+cargo build --locked --release
 ```
 
 The binary will be at `target/release/IDE_C--`.
@@ -142,7 +150,7 @@ This will compile the project in the container and automatically place the execu
 ./target/release/IDE_C--
 ```
 
-The host system still needs the GTK4 and GtkSourceView5 runtime libraries installed.
+The host system still needs GTK4 4.10+, GtkSourceView5 and the native runtime dependencies. Release Linux builds use the Debian 13 (Trixie) glibc baseline; older distributions may need a source build.
 
 ### Linux AppImage (Portable)
 
@@ -153,7 +161,7 @@ docker build -f Dockerfile.appimage -t ide-cmm-appimage .
 docker run --rm -v "$(pwd)":/build ide-cmm-appimage
 ```
 
-This will compile the project and use `linuxdeploy` to generate an AppImage file. The final `IDE_C---x86_64.AppImage` will be placed in the `releases/` directory.
+This will compile the project and use `linuxdeploy` to generate an AppImage file. The final `IDE_C--.AppImage` is written to `target/release/`. It bundles GTK4 and application libraries but relies on the host glibc. If FUSE is unavailable, run it with `APPIMAGE_EXTRACT_AND_RUN=1 ./target/release/IDE_C--.AppImage`.
 
 ### Windows Cross-Compilation
 
@@ -170,8 +178,10 @@ docker run --rm -v "$(pwd)":/build ide-cmm-mingw
 ```
 
 **Comparison of Windows builds:**
-- **MSYS2:** Faster to compile (when the Docker image is already built). The Docker image is ~3.84GB, and the resulting `.zip` file is ~40MB containing 141 DLLs. Uses [quasi-msys2](https://github.com/HolyBlackCat/quasi-msys2) packages.
-- **MinGW:** Slower to compile (when the Docker image is already built). The Docker image is ~3.89GB, and the resulting `.zip` file is ~60MB containing 161 DLLs. Uses Fedora's MinGW toolchain.
+- **MSYS2:** Recommended UCRT64 build using [quasi-msys2](https://github.com/HolyBlackCat/quasi-msys2) packages.
+- **MinGW:** Alternative build using Fedora's MinGW toolchain.
+
+Package sizes and DLL counts depend on the toolchain versions used for each release.
 
 Both generate a portable `.zip` archive (`IDE_C--_windows_msys2.zip` and `IDE_C--_windows_mingw.zip` respectively) in the `releases/` directory.
 
@@ -191,6 +201,35 @@ docker run --rm --privileged -v "$(pwd)":/build ide-cmm-macos
 ```
 
 The macOS binary will be output to `target/release/IDE_C--`. For a truly production-ready macOS build, it is highly recommended to use a native macOS machine, GitHub Actions or a Virtual Machine instead of Docker.
+
+---
+
+## Semantic Analysis
+
+Choose **Semantic Analysis → Run Semantic Analysis**. The current editor buffer feeds the lexical, syntax and semantic phases together. The Syntax Analysis action refreshes the same results and selects the original tree. Compare **Syntax** with **Semantic**, inspect declarations in **Hash Table**, and click diagnostics to navigate to source. Editing invalidates previous results. Lexical errors stop later phases; syntax recovery produces explicitly partial results.
+
+See [Phase 3 semantic rules](docs/phase3_semantic_rules.md) for attributes, symbol storage, conversion rules and examples. The existing `semantic.c--` demonstration intentionally contains errors and remains unchanged.
+
+## Tests
+
+```sh
+cargo test --locked
+# GTK integration: requires a real display or Xvfb.
+xvfb-run -a cargo test --locked gtk_semantic_views -- --ignored --test-threads=1
+python3 -m unittest discover -s scripts -p 'test_*.py'
+```
+
+The native Docker builder runs the Rust suite, GTK integration and a visible-window startup check before exporting its release binary.
+
+## Release Workflow
+
+The **Release 1.3 - Semantic Analyzer** workflow builds all four packages on separate GitHub runners from the exact workflow commit. Its Windows jobs launch each extracted ZIP with a system-only PATH, and Linux builders perform visible-window checks under Xvfb.
+
+Pushing the `release/1.3` branch runs build and startup checks without creating a tag or release. A manual run prepares a draft by default. Select **publish_release**, or push the explicit `1.3` tag, to publish it as stable and Latest after all checks pass. The tag is pushed only after the branch validation succeeds. Published releases and tags pointing to another commit are never overwritten. `1.2` remains unchanged. Creating or dispatching a workflow requires repository access; the workflow uses its own restricted GitHub token for the draft and publication.
+
+All assets must pass ZIP/ELF/PE validation, runtime DLL closure checks and source-provenance checks. The workflow generates `SHA256SUMS`, downloads the draft assets and compares their checksums before publication, then downloads and verifies the public assets again. Build manifests are retained as workflow artifacts.
+
+Local staging/verification helpers are available through `python3 scripts/release.py --help`. These scripts require Python 3.11 or newer. The four release assets are `IDE_C--`, `IDE_C--.AppImage`, `IDE_C--_windows_msys2.zip` and `IDE_C--_windows_mingw.zip`.
 
 ---
 
