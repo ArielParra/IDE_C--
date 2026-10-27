@@ -1,5 +1,5 @@
-use gtk::prelude::*;
 use gtk::TextView;
+use gtk::prelude::*;
 use sourceview5::View as SourceView;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -57,12 +57,15 @@ impl ErrorNavigator {
         Some((line_n, col_n))
     }
 
-    fn navigate_to(
+    pub(super) fn navigate_to(
         editor_view: &SourceView,
         editor_buffer: &gtk::TextBuffer,
         line: usize,
         column: usize,
     ) {
+        if line == 0 || column == 0 {
+            return;
+        }
         let line_idx = (line - 1) as i32;
         let col_idx = (column - 1) as i32;
 
@@ -140,10 +143,12 @@ impl AstNavigator {
                 if let Some(item) = model.item(pos) {
                     if let Ok(tree_row) = item.downcast::<gtk::TreeListRow>() {
                         if let Some(inner_item) = tree_row.item() {
-                            if let Ok(node_obj) = inner_item.downcast::<crate::ui::panels::ast_view::AstNodeObject>() {
+                            if let Ok(node_obj) =
+                                inner_item.downcast::<crate::ui::panels::ast_view::AstNodeObject>()
+                            {
                                 let line = node_obj.line();
                                 let col = node_obj.column();
-                                
+
                                 if line > 0 && col > 0 {
                                     ErrorNavigator::navigate_to(
                                         &editor_view_clone,

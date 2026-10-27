@@ -1,14 +1,17 @@
-use gtk::prelude::*;
-use gtk::{gio, glib, Label, ListView, ScrolledWindow, SignalListItemFactory, SingleSelection, TreeExpander, TreeListModel};
 use crate::models::ast::AstNode;
 use crate::ui::language_style::LanguageStyle;
+use gtk::prelude::*;
+use gtk::{
+    Label, ListView, ScrolledWindow, SignalListItemFactory, SingleSelection, TreeExpander,
+    TreeListModel, gio, glib,
+};
 
 mod imp {
-    use std::cell::RefCell;
     use gtk::gio;
     use gtk::glib;
     use gtk::glib::subclass::prelude::*;
     use gtk::prelude::*;
+    use std::cell::RefCell;
 
     #[derive(Default, glib::Properties)]
     #[properties(wrapper_type = super::AstNodeObject)]
@@ -42,7 +45,14 @@ gtk::glib::wrapper! {
 }
 
 impl AstNodeObject {
-    pub fn new(label: &str, color: &str, line: u32, column: u32, children_model: Option<gio::ListStore>, is_last_child: bool) -> Self {
+    pub fn new(
+        label: &str,
+        color: &str,
+        line: u32,
+        column: u32,
+        children_model: Option<gio::ListStore>,
+        is_last_child: bool,
+    ) -> Self {
         gtk::glib::Object::builder()
             .property("label", label)
             .property("color", color)
@@ -58,6 +68,7 @@ pub struct AstView {
     pub list_view: ListView,
     root_store: gio::ListStore,
     is_dark: bool,
+    copy_text: std::rc::Rc<std::cell::RefCell<String>>,
 }
 
 impl AstView {
@@ -71,7 +82,7 @@ impl AstView {
             |item| {
                 let node = item.downcast_ref::<AstNodeObject>().unwrap();
                 node.children_model().map(|m| m.upcast::<gio::ListModel>())
-            }
+            },
         );
 
         let selection_model = SingleSelection::new(Some(tree_model));
@@ -107,7 +118,10 @@ impl AstView {
 
             // Get widgets: prefix_label is first child, expander is second
             let prefix_label = hbox.first_child().and_downcast::<Label>().unwrap();
-            let expander = prefix_label.next_sibling().and_downcast::<TreeExpander>().unwrap();
+            let expander = prefix_label
+                .next_sibling()
+                .and_downcast::<TreeExpander>()
+                .unwrap();
             let content_label = expander.child().and_downcast::<Label>().unwrap();
 
             let row = list_item.item().and_downcast::<gtk::TreeListRow>().unwrap();
@@ -123,7 +137,10 @@ impl AstView {
             // Set colored content label
             let color = node.color();
             let escaped_label = glib::markup_escape_text(&node.label());
-            content_label.set_markup(&format!("<span foreground=\"{}\">{}</span>", color, escaped_label));
+            content_label.set_markup(&format!(
+                "<span foreground=\"{}\">{}</span>",
+                color, escaped_label
+            ));
         });
 
         let list_view = ListView::new(Some(selection_model), Some(factory));
@@ -131,7 +148,12 @@ impl AstView {
         list_view.set_single_click_activate(true);
 
         let is_dark = LanguageStyle::is_dark_mode();
-        AstView { list_view, root_store, is_dark }
+        AstView {
+            list_view,
+            root_store,
+            is_dark,
+            copy_text: Default::default(),
+        }
     }
 
     /// Build box-drawing prefix like: "│  ├── " or "   └── "
@@ -187,14 +209,39 @@ impl AstView {
             .build()
     }
 
+    pub fn copyable_widget(&self, tooltip: &str) -> gtk::Widget {
+        let overlay = gtk::Overlay::new();
+        overlay.set_child(Some(&self.widget()));
+        let button = gtk::Button::builder()
+            .icon_name("edit-copy-symbolic")
+            .tooltip_text(tooltip)
+            .halign(gtk::Align::End)
+            .valign(gtk::Align::Start)
+            .margin_end(24)
+            .margin_top(8)
+            .build();
+        let text = self.copy_text.clone();
+        button.connect_clicked(move |button| button.clipboard().set_text(&text.borrow()));
+        overlay.add_overlay(&button);
+        overlay.upcast()
+    }
+
     pub fn clear(&self) {
         self.root_store.remove_all();
+        self.copy_text.borrow_mut().clear();
     }
 
     pub fn populate(&self, root: &AstNode) {
         self.clear();
         let root_obj = self.create_node_object(root, true);
         self.root_store.append(&root_obj);
+        fn write(node: &AstNode, depth: usize, output: &mut String) {
+            output.push_str(&format!("{}{}\n", "  ".repeat(depth), node.display_label()));
+            for child in &node.children {
+                write(child, depth + 1, output);
+            }
+        }
+        write(root, 0, &mut self.copy_text.borrow_mut());
     }
 
     fn create_node_object(&self, node: &AstNode, is_last_child: bool) -> AstNodeObject {
@@ -213,35 +260,43 @@ impl AstView {
             None
         };
 
-        AstNodeObject::new(&node.label, &color, line, column, children_store, is_last_child)
+        AstNodeObject::new(
+            &node.display_label(),
+            &color,
+            line,
+            column,
+            children_store,
+            is_last_child,
+        )
     }
 
     fn label_color(label: &str, is_dark: bool) -> String {
-        let (error, id, number, string, bool_val, type_color, statement, operator, relational) = if is_dark {
-            (
-                "#f44747", // error
-                "#ff57f4", // id
-                "#b5cea8", // number
-                "#ce9178", // string
-                "#569cd6", // bool
-                "#569cd6", // type
-                "#569cd6", // statement
-                "#f44747", // operator
-                "#569cd6", // relational
-            )
-        } else {
-            (
-                "#d91919", // error
-                "#000000", // id
-                "#098658", // number
-                "#a31515", // string
-                "#0000ff", // bool
-                "#0000ff", // type
-                "#0000ff", // statement
-                "#000000", // operator
-                "#0000ff", // relational
-            )
-        };
+        let (error, id, number, string, bool_val, type_color, statement, operator, relational) =
+            if is_dark {
+                (
+                    "#f44747", // error
+                    "#ff57f4", // id
+                    "#b5cea8", // number
+                    "#ce9178", // string
+                    "#569cd6", // bool
+                    "#569cd6", // type
+                    "#569cd6", // statement
+                    "#f44747", // operator
+                    "#569cd6", // relational
+                )
+            } else {
+                (
+                    "#d91919", // error
+                    "#000000", // id
+                    "#098658", // number
+                    "#a31515", // string
+                    "#0000ff", // bool
+                    "#0000ff", // type
+                    "#0000ff", // statement
+                    "#000000", // operator
+                    "#0000ff", // relational
+                )
+            };
 
         if label.contains("Error") || label.contains("Unexpected") || label.contains("Unknown") {
             error.to_string()
@@ -255,7 +310,12 @@ impl AstView {
             bool_val.to_string()
         } else if label.starts_with("type:") {
             type_color.to_string()
-        } else if label == "main" || label == "if" || label == "while" || label == "do" || label == "until" {
+        } else if label == "main"
+            || label == "if"
+            || label == "while"
+            || label == "do"
+            || label == "until"
+        {
             statement.to_string()
         } else if label.contains("Expression")
             || label.contains("Selection")

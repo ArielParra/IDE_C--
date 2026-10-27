@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+//! Semantic attributes and diagnostics derived from a copy of the parser AST.
+mod value;
 
-use crate::models::ast::AstNode;
-use crate::models::SemanticError;
+use crate::models::{SemanticError, ast::AstNode};
+use std::collections::{HashMap, HashSet};
+use value::Constant;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SemanticType {
     Int,
     Float,
@@ -13,40 +15,16 @@ pub enum SemanticType {
 }
 
 impl SemanticType {
-    fn from_label(value: &str) -> Self {
-        let label = value.trim();
-        match label {
-            "int" | "INT_T" | "INT" => Self::Int,
-            "float" | "real" | "FLOAT_T" | "FLOAT" => Self::Float,
-            "bool" | "BOOL_T" | "BOOL" => Self::Bool,
-            "string" | "STRING" => Self::String,
+    fn from_label(label: &str) -> Self {
+        match label.trim() {
+            "int" => Self::Int,
+            "float" | "real" => Self::Float,
+            "bool" => Self::Bool,
+            "string" => Self::String,
             _ => Self::Unknown,
         }
     }
-
-    fn from_literal(label: &str) -> Self {
-        let normalized = label.trim();
-        if normalized.starts_with("number:") {
-            let raw = normalized.trim_start_matches("number:").trim();
-            if raw.contains('.') {
-                Self::Float
-            } else {
-                Self::Int
-            }
-        } else if normalized.starts_with("bool:") {
-            Self::Bool
-        } else if normalized.starts_with("string:") {
-            Self::String
-        } else {
-            Self::Unknown
-        }
-    }
-
-    fn is_numeric(&self) -> bool {
-        matches!(self, Self::Int | Self::Float)
-    }
-
-    fn as_str(&self) -> &str {
+    pub fn as_str(self) -> &'static str {
         match self {
             Self::Int => "int",
             Self::Float => "float",
@@ -54,6 +32,9 @@ impl SemanticType {
             Self::String => "string",
             Self::Unknown => "unknown",
         }
+    }
+    fn is_numeric(self) -> bool {
+        matches!(self, Self::Int | Self::Float)
     }
 }
 
@@ -63,609 +44,437 @@ pub struct Symbol {
     pub data_type: SemanticType,
     pub line: usize,
     pub column: usize,
+    pub scope_id: usize,
+    /// Logical storage slot, not a machine address or a byte offset.
+    pub offset: usize,
+    pub references: Vec<(usize, usize)>,
 }
 
-#[derive(Debug, Clone, Default)]
-pub struct SymbolTable {
-    scopes: Vec<HashMap<String, Symbol>>,
+#[derive(Debug)]
+pub struct SemanticResult {
+    pub annotated_ast: AstNode,
+    pub symbols: Vec<Symbol>,
+    pub errors: Vec<SemanticError>,
+}
+
+#[derive(Default)]
+struct SymbolTable {
+    scopes: Vec<(usize, HashMap<String, usize>)>,
+    symbols: Vec<Symbol>,
+    next_scope: usize,
 }
 
 impl SymbolTable {
-    pub fn new() -> Self {
-        Self {
-            scopes: vec![HashMap::new()],
-        }
+    fn push_scope(&mut self) {
+        self.scopes.push((self.next_scope, HashMap::new()));
+        self.next_scope += 1;
     }
-
-    pub fn push_scope(&mut self) {
-        self.scopes.push(HashMap::new());
+    fn lookup(&self, name: &str) -> Option<usize> {
+        self.scopes
+            .iter()
+            .rev()
+            .find_map(|(_, entries)| entries.get(name).copied())
     }
-
-    pub fn pop_scope(&mut self) {
-        if self.scopes.len() > 1 {
-            self.scopes.pop();
-        }
-    }
-
-    pub fn current_scope(&mut self) -> &mut HashMap<String, Symbol> {
-        self.scopes.last_mut().expect("semantic scope missing")
-    }
-
-    pub fn lookup(&self, name: &str) -> Option<&Symbol> {
-        for scope in self.scopes.iter().rev() {
-            if let Some(symbol) = scope.get(name) {
-                return Some(symbol);
-            }
-        }
-        None
-    }
-
-    pub fn declare(
-        &mut self,
-        name: &str,
-        data_type: SemanticType,
-        line: usize,
-        column: usize,
-    ) -> bool {
-        let scope = self.current_scope();
-        if scope.contains_key(name) {
+    fn declare(&mut self, name: &str, data_type: SemanticType, line: usize, column: usize) -> bool {
+        let (scope_id, entries) = self.scopes.last_mut().expect("active semantic scope");
+        if entries.contains_key(name) {
             return false;
         }
-
-        scope.insert(
-            name.to_string(),
-            Symbol {
-                name: name.to_string(),
-                data_type,
-                line,
-                column,
-            },
-        );
+        let offset = self.symbols.len();
+        entries.insert(name.to_string(), offset);
+        self.symbols.push(Symbol {
+            name: name.to_string(),
+            data_type,
+            line,
+            column,
+            scope_id: *scope_id,
+            offset,
+            references: Vec::new(),
+        });
         true
+    }
+}
+
+#[derive(Clone)]
+struct Attribute {
+    kind: SemanticType,
+    value: Option<Constant>,
+}
+impl Attribute {
+    fn unknown() -> Self {
+        Self {
+            kind: SemanticType::Unknown,
+            value: None,
+        }
+    }
+    fn typed(kind: SemanticType) -> Self {
+        Self { kind, value: None }
     }
 }
 
 pub struct SemanticAnalyzer {
     errors: Vec<SemanticError>,
-    symbol_table: SymbolTable,
-    initialized_scopes: Vec<HashMap<String, bool>>,
+    table: SymbolTable,
+    initialized: HashSet<usize>,
 }
 
 impl SemanticAnalyzer {
+    #[allow(dead_code)] // Compatibility API for callers that only need diagnostics.
     pub fn analyze(ast: &AstNode) -> Vec<SemanticError> {
-        let mut analyzer = Self::new();
-        analyzer.visit_node(ast);
-        analyzer.errors
+        Self::analyze_with_details(ast).errors
     }
 
-    fn new() -> Self {
-        Self {
+    pub fn analyze_with_details(ast: &AstNode) -> SemanticResult {
+        let mut analyzer = Self {
             errors: Vec::new(),
-            symbol_table: SymbolTable::new(),
-            initialized_scopes: vec![HashMap::new()],
+            table: SymbolTable::default(),
+            initialized: HashSet::new(),
+        };
+        analyzer.table.push_scope();
+        let mut annotated_ast = ast.clone();
+        analyzer.visit(&mut annotated_ast);
+        SemanticResult {
+            annotated_ast,
+            symbols: analyzer.table.symbols,
+            errors: analyzer.errors,
         }
     }
 
-    fn current_scope(&mut self) -> &mut HashMap<String, Symbol> {
-        self.symbol_table.current_scope()
+    fn error(&mut self, node: &AstNode, message: impl AsRef<str>) {
+        self.errors.push(SemanticError::new(
+            message.as_ref(),
+            node.line.unwrap_or(0),
+            node.column.unwrap_or(0),
+        ));
     }
 
-    fn lookup(&self, name: &str) -> Option<&Symbol> {
-        self.symbol_table.lookup(name)
-    }
-
-    fn declare(&mut self, name: &str, data_type: SemanticType, line: usize, column: usize) {
-        if !self
-            .symbol_table
-            .declare(name, data_type.clone(), line, column)
-        {
-            self.errors.push(SemanticError::new(
-                &format!("Variable '{}' is already declared in this scope.", name),
-                line,
-                column,
-            ));
-            return;
+    fn identifier(&mut self, node: &mut AstNode, read: bool) -> Option<usize> {
+        let name = node.label.strip_prefix("id:")?.trim().to_string();
+        let Some(id) = self.table.lookup(&name) else {
+            self.error(
+                node,
+                format!("Variable '{name}' is not declared in this scope."),
+            );
+            node.annotate_type("unknown");
+            return None;
+        };
+        let symbol = &mut self.table.symbols[id];
+        symbol
+            .references
+            .push((node.line.unwrap_or(0), node.column.unwrap_or(0)));
+        node.annotate_type(symbol.data_type.as_str());
+        if read && !self.initialized.contains(&id) {
+            self.error(
+                node,
+                format!("Variable '{name}' is used before initialization."),
+            );
         }
-
-        self.initialized_scopes
-            .last_mut()
-            .expect("semantic scope missing")
-            .insert(name.to_string(), false);
+        Some(id)
     }
 
-    fn push_scope(&mut self) {
-        self.symbol_table.push_scope();
-        self.initialized_scopes.push(HashMap::new());
-    }
-
-    fn pop_scope(&mut self) {
-        self.symbol_table.pop_scope();
-        if self.initialized_scopes.len() > 1 {
-            self.initialized_scopes.pop();
+    fn block(&mut self, node: &mut AstNode) {
+        self.table.push_scope();
+        for child in &mut node.children {
+            self.visit(child);
         }
-    }
-
-    fn mark_initialized(&mut self, name: &str) {
-        for scope in self.initialized_scopes.iter_mut().rev() {
-            if scope.contains_key(name) {
-                scope.insert(name.to_string(), true);
-                return;
-            }
+        let (_, entries) = self.table.scopes.pop().expect("active semantic scope");
+        for id in entries.values() {
+            self.initialized.remove(id);
         }
     }
 
-    fn check_initialized_use(&mut self, name: &str, line: usize, column: usize) {
-        for scope in self.initialized_scopes.iter().rev() {
-            if let Some(initialized) = scope.get(name) {
-                if !initialized {
-                    self.errors.push(SemanticError::new(
-                        &format!("Variable '{}' is used before initialization.", name),
-                        line,
-                        column,
-                    ));
-                }
-                return;
-            }
+    fn condition(&mut self, node: &mut AstNode, context: &str) {
+        let kind = self.visit(node).kind;
+        if kind != SemanticType::Bool && kind != SemanticType::Unknown {
+            self.error(node, format!("Condition in '{context}' must be boolean."));
         }
     }
 
-    fn annotate_node_type(&self, node: &AstNode, result: SemanticType) {
-        let mut node_copy = node.clone();
-        node_copy.annotated_type = Some(result.as_str().to_string());
-    }
-
-    fn visit_node(&mut self, node: &AstNode) -> SemanticType {
-        match node.label.as_str() {
-            "Program" => {
-                for child in &node.children {
-                    self.visit_node(child);
-                }
-                SemanticType::Unknown
-            }
-            "MainProgram" => {
-                for child in &node.children {
-                    if child.label != "main" {
-                        self.visit_node(child);
-                    }
-                }
-                SemanticType::Unknown
-            }
-            "DeclarationList" => {
-                for child in &node.children {
-                    self.visit_node(child);
-                }
-                SemanticType::Unknown
-            }
+    fn visit(&mut self, node: &mut AstNode) -> Attribute {
+        // Re-running on a previously annotated tree must not retain stale attributes.
+        node.annotated_type = None;
+        node.attributed_value = None;
+        node.coerced_type = None;
+        let result = match node.label.as_str() {
             "VariableDeclaration" => {
-                let declared_type = self.extract_decl_type(node);
-                let identifiers = node
+                let kind = node
                     .children
                     .iter()
-                    .find(|child| child.label == "Identifiers");
-
-                if let Some(list) = identifiers {
-                    for identifier in &list.children {
-                        let name = extract_identifier_name(identifier);
-                        if name.is_empty() {
-                            continue;
+                    .find_map(|n| n.label.strip_prefix("type:"))
+                    .map(SemanticType::from_label)
+                    .unwrap_or(SemanticType::Unknown);
+                for child in &mut node.children {
+                    if child.label.starts_with("type:") {
+                        child.annotate_type(kind.as_str());
+                    }
+                    if child.label == "Identifiers" {
+                        child.annotate_type(kind.as_str());
+                        for identifier in &mut child.children {
+                            let name = identifier
+                                .label
+                                .strip_prefix("id:")
+                                .unwrap_or(&identifier.label)
+                                .trim()
+                                .to_string();
+                            identifier.annotate_type(kind.as_str());
+                            if !self.table.declare(
+                                &name,
+                                kind,
+                                identifier.line.unwrap_or(0),
+                                identifier.column.unwrap_or(0),
+                            ) {
+                                self.error(
+                                    identifier,
+                                    format!("Variable '{name}' is already declared in this scope."),
+                                );
+                            }
                         }
-                        self.declare(
-                            &name,
-                            declared_type.clone(),
-                            identifier.line.unwrap_or(0),
-                            identifier.column.unwrap_or(0),
-                        );
                     }
                 }
-                SemanticType::Unknown
+                Attribute::typed(kind)
             }
             "Assignment" => {
-                let target_name = node
+                let before = self.errors.len();
+                let id = node
                     .children
-                    .first()
-                    .map(extract_identifier_name)
-                    .unwrap_or_default();
-
-                if target_name.is_empty() {
-                    return SemanticType::Unknown;
-                }
-
-                let target_type = match self.lookup(&target_name).cloned() {
-                    Some(symbol) => symbol.data_type,
-                    None => {
-                        self.errors.push(SemanticError::new(
-                            &format!("Variable '{}' is not declared in this scope.", target_name),
-                            node.line.unwrap_or(0),
-                            node.column.unwrap_or(0),
-                        ));
-                        SemanticType::Unknown
-                    }
-                };
-                let expr_type = node
+                    .first_mut()
+                    .and_then(|n| self.identifier(n, false));
+                let source = node
                     .children
-                    .iter()
-                    .skip(1)
-                    .find(|child| {
-                        child.label != "ExpressionStatement" || !child.children.is_empty()
-                    })
-                    .map(|child| self.expression_type_from_node(child))
+                    .get_mut(1)
+                    .map(|n| self.visit(n))
+                    .unwrap_or_else(Attribute::unknown);
+                let target = id
+                    .map(|i| self.table.symbols[i].data_type)
                     .unwrap_or(SemanticType::Unknown);
-
-                if !self.is_assignable(target_type.clone(), expr_type.clone()) {
-                    self.errors.push(SemanticError::new(
-                        &format!(
-                            "Cannot assign value of type '{}' to variable '{}' of type '{}'.",
-                            expr_type.as_str(),
-                            target_name,
-                            target_type.as_str()
+                let compatible = target != SemanticType::Unknown
+                    && source.kind != SemanticType::Unknown
+                    && (target == source.kind
+                        || (target == SemanticType::Float && source.kind == SemanticType::Int));
+                if !compatible
+                    && target != SemanticType::Unknown
+                    && source.kind != SemanticType::Unknown
+                {
+                    self.error(
+                        node,
+                        format!(
+                            "Cannot assign value of type '{}' to variable of type '{}'.",
+                            source.kind.as_str(),
+                            target.as_str()
                         ),
-                        node.line.unwrap_or(0),
-                        node.column.unwrap_or(0),
-                    ));
-                }
-
-                self.mark_initialized(&target_name);
-                target_type
-            }
-            "ExpressionStatement" => {
-                let mut result = SemanticType::Unknown;
-                for child in &node.children {
-                    if child.label == "empty" {
-                        continue;
-                    }
-                    result = self.expression_type_from_node(child);
-                }
-                result
-            }
-            "Selection" => {
-                let condition = node
-                    .children
-                    .get(1)
-                    .map(|child| self.visit_node(child))
-                    .unwrap_or(SemanticType::Unknown);
-                if condition != SemanticType::Bool {
-                    self.errors.push(SemanticError::new(
-                        "Condition in 'if' must be boolean.",
-                        node.line.unwrap_or(0),
-                        node.column.unwrap_or(0),
-                    ));
-                }
-
-                for child in &node.children {
-                    if matches!(child.label.as_str(), "ThenBlock" | "ElseBlock") {
-                        self.visit_block(child);
-                    }
-                }
-                SemanticType::Unknown
-            }
-            "Iteration" => {
-                let condition = node
-                    .children
-                    .get(1)
-                    .map(|child| self.visit_node(child))
-                    .unwrap_or(SemanticType::Unknown);
-                if condition != SemanticType::Bool {
-                    self.errors.push(SemanticError::new(
-                        "Condition in 'while' must be boolean.",
-                        node.line.unwrap_or(0),
-                        node.column.unwrap_or(0),
-                    ));
-                }
-
-                for child in &node.children {
-                    if child.label == "WhileBody" {
-                        self.visit_block(child);
-                    }
-                }
-                SemanticType::Unknown
-            }
-            "Repetition" => {
-                let mut condition_type = SemanticType::Unknown;
-                for child in &node.children {
-                    if child.label == "DoBody" {
-                        self.visit_block(child);
-                    } else if child.label == "while" || child.label == "until" {
-                        continue;
-                    } else if child.label != "do" {
-                        condition_type = self.visit_node(child);
-                        if condition_type != SemanticType::Bool {
-                            self.errors.push(SemanticError::new(
-                                "Condition in repetition loop must be boolean.",
-                                node.line.unwrap_or(0),
-                                node.column.unwrap_or(0),
-                            ));
-                        }
-                    }
-                }
-                condition_type
-            }
-            "Input" => {
-                for child in &node.children {
-                    let name = extract_identifier_name(child);
-                    if !name.is_empty() {
-                        self.resolve_variable_type(
-                            &name,
-                            child.line.unwrap_or(0),
-                            child.column.unwrap_or(0),
-                        );
-                        self.mark_initialized(&name);
-                    }
-                }
-                SemanticType::Unknown
-            }
-            "Output" | "OutputChain" => {
-                for child in &node.children {
-                    self.visit_node(child);
-                }
-                SemanticType::Unknown
-            }
-            _ => {
-                if node.label.starts_with("id: ") {
-                    let name = extract_identifier_name(node);
-                    return self.resolve_variable_type(
-                        &name,
-                        node.line.unwrap_or(0),
-                        node.column.unwrap_or(0),
                     );
                 }
-
-                if node.label.starts_with("number:")
-                    || node.label.starts_with("bool:")
-                    || node.label.starts_with("string:")
-                {
-                    return SemanticType::from_literal(&node.label);
+                if compatible && target != source.kind {
+                    if let Some(rhs) = node.children.get_mut(1) {
+                        Self::coerce(rhs);
+                    }
                 }
-
-                if node.label.starts_with("Relational(")
-                    || node.label.starts_with("LogicalAnd")
-                    || node.label.starts_with("LogicalOr")
-                    || node.label.starts_with("AddOp(")
-                    || node.label.starts_with("MulOp(")
-                    || node.label.starts_with("Power")
-                    || node.label.starts_with("Prefix(")
-                    || node.label.starts_with("Postfix(")
-                    || node.label.starts_with("UnaryOp(")
-                    || node.label == "Not"
-                {
-                    return self.visit_expression(node);
+                if compatible && self.errors.len() == before {
+                    if let Some(id) = id {
+                        self.initialized.insert(id);
+                    }
                 }
-
-                for child in &node.children {
-                    self.visit_node(child);
+                Attribute::typed(target)
+            }
+            "Selection" => {
+                if let Some(condition) = node.children.get_mut(1) {
+                    self.condition(condition, "if");
                 }
-                SemanticType::Unknown
-            }
-        }
-    }
-
-    fn visit_block(&mut self, node: &AstNode) {
-        self.push_scope();
-        for child in &node.children {
-            self.visit_node(child);
-        }
-        self.pop_scope();
-    }
-
-    fn visit_expression(&mut self, node: &AstNode) -> SemanticType {
-        if node.label == "Not" {
-            let operand = node
-                .children
-                .first()
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-            if operand != SemanticType::Bool {
-                self.errors.push(SemanticError::new(
-                    "Logical negation requires a boolean operand.",
-                    node.line.unwrap_or(0),
-                    node.column.unwrap_or(0),
-                ));
-            }
-            return SemanticType::Bool;
-        }
-
-        if node.label.starts_with("Relational(") {
-            let left = node
-                .children
-                .first()
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-            let right = node
-                .children
-                .get(1)
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-
-            if !self.is_comparable(left.clone(), right.clone()) {
-                self.errors.push(SemanticError::new(
-                    "Relational operators require comparable operands.",
-                    node.line.unwrap_or(0),
-                    node.column.unwrap_or(0),
-                ));
-            }
-            return SemanticType::Bool;
-        }
-
-        if node.label.starts_with("LogicalAnd") || node.label.starts_with("LogicalOr") {
-            let left = node
-                .children
-                .first()
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-            let right = node
-                .children
-                .get(1)
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-
-            if left != SemanticType::Bool || right != SemanticType::Bool {
-                self.errors.push(SemanticError::new(
-                    "Logical operators require boolean operands.",
-                    node.line.unwrap_or(0),
-                    node.column.unwrap_or(0),
-                ));
-            }
-            return SemanticType::Bool;
-        }
-
-        if node.label.starts_with("AddOp(")
-            || node.label.starts_with("MulOp(")
-            || node.label.starts_with("Power")
-        {
-            let left = node
-                .children
-                .first()
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-            let right = node
-                .children
-                .get(1)
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-
-            let result = if left.is_numeric() && right.is_numeric() {
-                if left == SemanticType::Float || right == SemanticType::Float {
-                    SemanticType::Float
+                let incoming = self.initialized.clone();
+                let mut branches = Vec::new();
+                for child in &mut node.children {
+                    if matches!(child.label.as_str(), "ThenBlock" | "ElseBlock") {
+                        self.initialized = incoming.clone();
+                        self.block(child);
+                        branches.push(self.initialized.clone());
+                    }
+                }
+                self.initialized = if branches.len() == 2 {
+                    branches[0].intersection(&branches[1]).copied().collect()
                 } else {
-                    SemanticType::Int
+                    incoming
+                };
+                Attribute::unknown()
+            }
+            "Iteration" => {
+                if let Some(condition) = node.children.get_mut(1) {
+                    self.condition(condition, "while");
                 }
-            } else {
-                self.errors.push(SemanticError::new(
-                    "Arithmetic operators require numeric operands.",
-                    node.line.unwrap_or(0),
-                    node.column.unwrap_or(0),
-                ));
-                SemanticType::Unknown
-            };
-
-            return result;
-        }
-
-        if node.label.starts_with("Prefix(")
-            || node.label.starts_with("Postfix(")
-            || node.label.starts_with("UnaryOp(")
-        {
-            let operand = node
+                let incoming = self.initialized.clone();
+                for child in &mut node.children {
+                    if child.label == "WhileBody" {
+                        self.block(child);
+                    }
+                }
+                self.initialized = incoming;
+                Attribute::unknown()
+            }
+            "Repetition" => {
+                for child in &mut node.children {
+                    match child.label.as_str() {
+                        "DoBody" => self.block(child),
+                        "do" | "while" | "until" => {}
+                        _ => self.condition(child, "repetition"),
+                    }
+                }
+                Attribute::unknown()
+            }
+            "Input" => {
+                for child in &mut node.children {
+                    if let Some(id) = self.identifier(child, false) {
+                        self.initialized.insert(id);
+                    }
+                }
+                Attribute::unknown()
+            }
+            "ExpressionStatement" => node
                 .children
-                .first()
-                .map(|child| self.visit_node(child))
-                .unwrap_or(SemanticType::Unknown);
-            if !operand.is_numeric() {
-                self.errors.push(SemanticError::new(
-                    "Increment and decrement operators require numeric variables.",
-                    node.line.unwrap_or(0),
-                    node.column.unwrap_or(0),
-                ));
+                .iter_mut()
+                .filter(|n| n.label != "empty")
+                .map(|n| self.visit(n))
+                .last()
+                .unwrap_or_else(Attribute::unknown),
+            _ if node.label.starts_with("id:") => {
+                let id = self.identifier(node, true);
+                Attribute::typed(
+                    id.map(|i| self.table.symbols[i].data_type)
+                        .unwrap_or(SemanticType::Unknown),
+                )
             }
-            return operand;
-        }
-
-        if node.label.starts_with("id: ") {
-            let name = extract_identifier_name(node);
-            return self.resolve_variable_type(
-                &name,
-                node.line.unwrap_or(0),
-                node.column.unwrap_or(0),
-            );
-        }
-
-        if node.label.starts_with("number:")
-            || node.label.starts_with("bool:")
-            || node.label.starts_with("string:")
-        {
-            return SemanticType::from_literal(&node.label);
-        }
-
-        for child in &node.children {
-            self.visit_node(child);
-        }
-        SemanticType::Unknown
-    }
-
-    fn resolve_variable_type(&mut self, name: &str, line: usize, column: usize) -> SemanticType {
-        match self.lookup(name).cloned() {
-            Some(symbol) => {
-                self.check_initialized_use(name, line, column);
-                symbol.data_type
-            }
-            None => {
-                self.errors.push(SemanticError::new(
-                    &format!("Variable '{}' is not declared in this scope.", name),
-                    line,
-                    column,
-                ));
-                SemanticType::Unknown
-            }
-        }
-    }
-
-    fn extract_decl_type(&self, node: &AstNode) -> SemanticType {
-        node.children
-            .iter()
-            .find(|child| child.label.starts_with("type:"))
-            .map(|child| child.label.trim_start_matches("type:").trim().to_string())
-            .map(|kind| SemanticType::from_label(&kind))
-            .unwrap_or(SemanticType::Unknown)
-    }
-
-    fn expression_type_from_node(&mut self, node: &AstNode) -> SemanticType {
-        if node.label == "ExpressionStatement" {
-            for child in &node.children {
-                if child.label == "empty" {
-                    continue;
+            _ if node.label.starts_with("number:")
+                || node.label.starts_with("bool:")
+                || node.label.starts_with("string:") =>
+            {
+                match Constant::literal(&node.label) {
+                    Some(value) => Attribute {
+                        kind: value.kind(),
+                        value: Some(value),
+                    },
+                    None => {
+                        self.error(node, "Constant is outside the supported numeric range.");
+                        Attribute::unknown()
+                    }
                 }
-                return self.expression_type_from_node(child);
             }
-            return SemanticType::Unknown;
+            _ if Self::is_operator(&node.label) => self.expression(node),
+            _ => {
+                for child in &mut node.children {
+                    self.visit(child);
+                }
+                Attribute::unknown()
+            }
+        };
+        if result.kind != SemanticType::Unknown || Self::is_operator(&node.label) {
+            node.annotate_type(result.kind.as_str());
         }
-
-        if node.label.starts_with("id: ") {
-            let name = extract_identifier_name(node);
-            return self.resolve_variable_type(
-                &name,
-                node.line.unwrap_or(0),
-                node.column.unwrap_or(0),
-            );
+        if let Some(value) = &result.value {
+            node.annotate_value(&value.display());
         }
+        result
+    }
 
-        if node.label.starts_with("number:")
-            || node.label.starts_with("bool:")
-            || node.label.starts_with("string:")
+    fn coerce(node: &mut AstNode) {
+        node.coerced_type = Some("float".to_string());
+        if node.label == "ExpressionStatement" {
+            if let Some(child) = node.children.first_mut() {
+                Self::coerce(child);
+            }
+        }
+    }
+
+    fn is_operator(label: &str) -> bool {
+        label == "Not"
+            || [
+                "AddOp(",
+                "MulOp(",
+                "Relational(",
+                "Logical",
+                "Power",
+                "Prefix(",
+                "Postfix(",
+                "UnaryOp(",
+            ]
+            .iter()
+            .any(|p| label.starts_with(p))
+    }
+
+    fn expression(&mut self, node: &mut AstNode) -> Attribute {
+        let before = self.errors.len();
+        let args: Vec<_> = node
+            .children
+            .iter_mut()
+            .map(|child| self.visit(child))
+            .collect();
+        if args.is_empty() || args.iter().any(|a| a.kind == SemanticType::Unknown) {
+            return Attribute::unknown();
+        }
+        let unary_update = ["Prefix(", "Postfix(", "UnaryOp("]
+            .iter()
+            .any(|p| node.label.starts_with(p));
+        let kind = if unary_update {
+            if args[0].kind.is_numeric() && node.children[0].label.starts_with("id:") {
+                args[0].kind
+            } else {
+                self.error(
+                    node,
+                    "Increment and decrement operators require numeric variables.",
+                );
+                return Attribute::unknown();
+            }
+        } else if node.label == "Not" || node.label.starts_with("Logical") {
+            if args.iter().all(|a| a.kind == SemanticType::Bool) {
+                SemanticType::Bool
+            } else {
+                self.error(node, "Logical operators require boolean operands.");
+                return Attribute::unknown();
+            }
+        } else if args.len() < 2 {
+            return Attribute::unknown();
+        } else if node.label.starts_with("Relational(") {
+            let numeric = args.iter().all(|a| a.kind.is_numeric());
+            let equality = matches!(node.label.as_str(), "Relational(==)" | "Relational(!=)");
+            if numeric || (equality && args.iter().all(|a| a.kind == SemanticType::Bool)) {
+                SemanticType::Bool
+            } else {
+                self.error(node, "Relational operators require comparable operands.");
+                return Attribute::unknown();
+            }
+        } else if args.iter().all(|a| a.kind.is_numeric()) {
+            if args.iter().any(|a| a.kind == SemanticType::Float) {
+                SemanticType::Float
+            } else {
+                SemanticType::Int
+            }
+        } else {
+            self.error(node, "Arithmetic operators require numeric operands.");
+            return Attribute::unknown();
+        };
+        // Explicitly record numeric promotions on operands without changing the syntax tree.
+        if args.len() == 2
+            && args.iter().all(|a| a.kind.is_numeric())
+            && args.iter().any(|a| a.kind == SemanticType::Float)
         {
-            return SemanticType::from_literal(&node.label);
+            for (child, arg) in node.children.iter_mut().zip(&args) {
+                if arg.kind == SemanticType::Int {
+                    Self::coerce(child);
+                }
+            }
         }
-
-        self.visit_expression(node)
-    }
-
-    fn is_assignable(&self, target: SemanticType, source: SemanticType) -> bool {
-        if target == source {
-            return true;
-        }
-        if target == SemanticType::Float && source == SemanticType::Int {
-            return true;
-        }
-        false
-    }
-
-    fn is_comparable(&self, left: SemanticType, right: SemanticType) -> bool {
-        if left == SemanticType::Unknown || right == SemanticType::Unknown {
-            return false;
-        }
-        if left == SemanticType::Bool && right == SemanticType::Bool {
-            return true;
-        }
-        if left.is_numeric() && right.is_numeric() {
-            return true;
-        }
-        false
-    }
-}
-
-fn extract_identifier_name(node: &AstNode) -> String {
-    let label = node.label.trim();
-    if let Some(rest) = label.strip_prefix("id: ") {
-        rest.to_string()
-    } else {
-        label.to_string()
+        let value = if unary_update || self.errors.len() != before {
+            None
+        } else {
+            let constants: Option<Vec<_>> = args.iter().map(|a| a.value.clone()).collect();
+            match constants {
+                Some(values) => match Constant::evaluate(&node.label, &values) {
+                    Ok(value) => Some(value),
+                    Err(message) => {
+                        self.error(node, message);
+                        None
+                    }
+                },
+                None => None,
+            }
+        };
+        Attribute { kind, value }
     }
 }

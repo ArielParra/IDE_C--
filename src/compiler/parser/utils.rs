@@ -7,7 +7,11 @@ use std::path::Path;
 pub fn write_tokens_to_file(tokens: &[Token], path: &Path) -> std::io::Result<()> {
     let mut file = std::fs::File::create(path)?;
     for t in tokens {
-        writeln!(file, "{} {} {} {}", t.token_type, t.lexeme, t.line, t.column)?;
+        writeln!(
+            file,
+            "{} {} {} {}",
+            t.token_type, t.lexeme, t.line, t.column
+        )?;
     }
     Ok(())
 }
@@ -17,6 +21,7 @@ pub fn write_tokens_to_file(tokens: &[Token], path: &Path) -> std::io::Result<()
 ///
 /// The parser splits from the right to handle lexemes that contain spaces
 /// (e.g. string literals).
+#[allow(dead_code)] // Compatibility for consumers of exported token files.
 pub fn parse_tokens_from_text(input: &str) -> Vec<Token> {
     input
         .lines()
@@ -42,6 +47,7 @@ pub fn parse_tokens_from_text(input: &str) -> Vec<Token> {
 }
 
 /// Reads tokens from a file path, returning an empty vec on error.
+#[allow(dead_code)] // Compatibility for consumers of exported token files.
 pub fn read_tokens_from_file(path: &Path) -> Vec<Token> {
     match std::fs::read_to_string(path) {
         Ok(contents) => parse_tokens_from_text(&contents),
