@@ -100,7 +100,10 @@ def verify_windows(path):
             if not name.lower().endswith(('.dll', '.exe')):
                 continue
             for dependency in pe_imports(archive.read(name)):
-                system = dependency.removesuffix('.dll') in SYSTEM_DLLS or dependency.startswith(('api-ms-win-', 'ext-ms-win-'))
+                system = (
+                    dependency.removesuffix('.dll').removesuffix('.drv') in SYSTEM_DLLS
+                    or dependency.startswith(('api-ms-win-', 'ext-ms-win-'))
+                )
                 if not system and dependency not in bundled:
                     raise ValueError(f'Missing runtime DLL {dependency} required by {name}')
 
