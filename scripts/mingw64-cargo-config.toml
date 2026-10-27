@@ -1,0 +1,8 @@
+[target.x86_64-pc-windows-gnu]
+linker = "x86_64-w64-mingw32-gcc"
+ar     = "x86_64-w64-mingw32-ar"
+
+[env]
+PKG_CONFIG_ALLOW_CROSS_x86_64_pc_windows_gnu  = "1"
+PKG_CONFIG_PATH_x86_64_pc_windows_gnu         = "/usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig"
+PKG_CONFIG_SYSROOT_DIR_x86_64_pc_windows_gnu  = "/usr/x86_64-w64-mingw32/sys-root/mingw"

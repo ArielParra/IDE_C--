@@ -30,13 +30,8 @@ RUN darling shell -c 'source ~/.bash_profile && brew install rust gtk4 gtksource
 WORKDIR /build
 
 # Build script that executes cargo inside Darling
-RUN echo '#!/bin/bash\n\
-set -e\n\
-echo "Starting macOS build inside Darling..."\n\
-darling shell -c "source ~/.bash_profile && cd /Volumes/SystemRoot/build && cargo build --release"\n\
-echo "Build finished."\n\
-' > /usr/local/bin/build-macos && \
-    chmod +x /usr/local/bin/build-macos
+COPY scripts/build-macos.sh /usr/local/bin/build-macos
+RUN chmod +x /usr/local/bin/build-macos
 
 # Ensure we run with privileged mode
 CMD ["/usr/local/bin/build-macos"]
