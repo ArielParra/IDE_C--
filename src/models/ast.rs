@@ -6,9 +6,25 @@ pub struct AstNode {
     pub column: Option<usize>,
     pub annotated_type: Option<String>,
     pub attributed_value: Option<String>,
+    pub coerced_type: Option<String>,
 }
 
 impl AstNode {
+    pub fn display_label(&self) -> String {
+        let mut label = self.label.clone();
+        if let Some(kind) = &self.annotated_type {
+            label.push_str(&format!(" [type: {kind}"));
+            if let Some(coerced) = &self.coerced_type {
+                label.push_str(&format!(" -> {coerced}"));
+            }
+            if let Some(value) = &self.attributed_value {
+                label.push_str(&format!(", value: {value}"));
+            }
+            label.push(']');
+        }
+        label
+    }
+
     pub fn new(label: impl Into<String>) -> Self {
         AstNode {
             label: label.into(),
@@ -17,6 +33,7 @@ impl AstNode {
             column: None,
             annotated_type: None,
             attributed_value: None,
+            coerced_type: None,
         }
     }
 

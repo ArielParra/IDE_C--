@@ -16,3 +16,8 @@ Desktop.ini
 # Ignore git
 .git/
 .gitignore
+
+# Exported binaries and release staging
+releases/
+release-artifacts/
+*.AppImage

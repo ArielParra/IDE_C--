@@ -1,10 +1,10 @@
 use gtk::prelude::*;
 use gtk::{Application, ApplicationWindow, Box, Orientation, SearchBar, SearchEntry};
 
-use super::editor::{create_editor, EditorSettings};
+use super::editor::{EditorSettings, create_editor};
 use super::headerbar::IDEHeaderBar;
 use super::menu::build_menu;
-use super::panels::{create_panels, Layout};
+use super::panels::{Layout, create_panels};
 use crate::models::new_file_state;
 use crate::ui::language_style::LanguageStyle;
 
@@ -40,9 +40,7 @@ impl Window {
         let headerbar = IDEHeaderBar::new(app);
         let file_state = new_file_state();
 
-        let search_bar = SearchBar::builder()
-            .key_capture_widget(&window)
-            .build();
+        let search_bar = SearchBar::builder().key_capture_widget(&window).build();
         let search_entry = SearchEntry::builder()
             .placeholder_text("Search text...")
             .hexpand(true)
@@ -55,13 +53,7 @@ impl Window {
             &editor.buffer,
             editor.view,
             file_state,
-            panels.lexic_view,
-            panels.errors_view,
-            panels.syntax_errors_view,
-            panels.semantic_errors_view,
-            panels.ast_view.clone(),
-            panels.debug.clone(),
-            panels.errors.clone(),
+            panels,
             search_bar.clone(),
             search_entry.clone(),
         );

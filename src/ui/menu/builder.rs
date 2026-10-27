@@ -61,7 +61,7 @@ impl MenuBuilder {
         compiler.append(Some("_Compile"), Some("app.c--compiler"));
         compiler.append(Some("_Lexical Analysis"), Some("app.lexico"));
         compiler.append(Some("_Syntax Analysis"), Some("app.sintactico"));
-        compiler.append(Some("Se_mantic Analysis"), Some("app.semantico"));
+        compiler.append(Some("Se_mantic Analysis"), Some("app.semantic"));
         compiler.append(Some("_Intermediate Code"), Some("app.intermedio"));
         compiler.append(Some("_Execute"), Some("app.ejecutar"));
 

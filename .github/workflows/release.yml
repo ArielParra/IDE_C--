@@ -1,0 +1,142 @@
+name: Release 1.3 - Semantic Analyzer
+
+on:
+  push:
+    branches: [release/1.3]
+    tags: ['1.3']
+  workflow_dispatch:
+    inputs:
+      publish_release:
+        description: Publish the verified draft as stable and Latest
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-1.3
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            dockerfile: Dockerfile
+          - platform: appimage
+            dockerfile: Dockerfile.appimage
+          - platform: msys2
+            dockerfile: Dockerfile.msys2
+          - platform: mingw
+            dockerfile: Dockerfile.mingw
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Validate release tooling
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+      - name: Build and package from the locked source
+        env:
+          DOCKERFILE: ${{ matrix.dockerfile }}
+          GSK_RENDERER: cairo
+        run: |
+          docker build --file "$DOCKERFILE" --tag ide-cmm-release .
+          docker run --rm --env GSK_RENDERER --volume "$GITHUB_WORKSPACE:/build" ide-cmm-release
+      - name: Record source revision and asset digest
+        env:
+          PLATFORM: ${{ matrix.platform }}
+        run: python3 scripts/release.py stage --platform "$PLATFORM" --sha "$GITHUB_SHA"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: release-${{ matrix.platform }}
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 14
+
+  windows-smoke:
+    name: Windows startup (${{ matrix.platform }})
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: msys2
+            archive: IDE_C--_windows_msys2.zip
+          - platform: mingw
+            archive: IDE_C--_windows_mingw.zip
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: release-${{ matrix.platform }}
+          path: release-artifacts
+      - name: Launch using only bundled runtime DLLs
+        shell: pwsh
+        env:
+          ARCHIVE: ${{ matrix.archive }}
+        run: ./scripts/smoke-windows.ps1 -Archive "release-artifacts/$env:ARCHIVE"
+
+  release:
+    name: Verify, draft and optionally publish
+    needs: [build, windows-smoke]
+    if: ${{ github.event_name == 'workflow_dispatch' || github.ref == 'refs/tags/1.3' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: release-artifacts
+      - name: Verify architecture, runtime dependencies and provenance
+        run: python3 scripts/release.py verify --sha "$GITHUB_SHA"
+      - name: Create or update the draft for this exact commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 scripts/publish-release.py draft --sha "$GITHUB_SHA"
+          gh release upload 1.3 \
+            release-artifacts/IDE_C-- \
+            release-artifacts/IDE_C--.AppImage \
+            release-artifacts/IDE_C--_windows_msys2.zip \
+            release-artifacts/IDE_C--_windows_mingw.zip \
+            release-artifacts/SHA256SUMS --clobber
+          gh release download 1.3 --dir downloaded
+          python3 scripts/release.py downloaded --sha "$GITHUB_SHA" --directory downloaded
+          cmp release-artifacts/SHA256SUMS downloaded/SHA256SUMS
+      - name: Publish stable release
+        if: ${{ inputs.publish_release || github.ref == 'refs/tags/1.3' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 scripts/publish-release.py publish --sha "$GITHUB_SHA"
+          gh release download 1.3 --dir published
+          python3 scripts/release.py downloaded --sha "$GITHUB_SHA" --directory published
+          cmp release-artifacts/SHA256SUMS published/SHA256SUMS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: verified-release-1.3
+          path: release-artifacts/
+          if-no-files-found: error
+          retention-days: 30

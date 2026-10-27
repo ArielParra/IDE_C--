@@ -24,19 +24,7 @@ RUN dnf install -y \
     && dnf clean all
 
 # Build GtkSourceView5 for Windows target from source
-RUN cat > /tmp/mingw64-cross.ini << 'INI'
-[binaries]
-c = 'x86_64-w64-mingw32-gcc'
-cpp = 'x86_64-w64-mingw32-g++'
-ar = 'x86_64-w64-mingw32-ar'
-pkgconfig = 'x86_64-w64-mingw32-pkg-config'
-
-[host_machine]
-system = 'windows'
-cpu_family = 'x86_64'
-cpu = 'x86_64'
-endian = 'little'
-INI
+COPY scripts/mingw64-cross.ini /tmp/mingw64-cross.ini
 
 RUN git clone --depth=1 https://gitlab.gnome.org/GNOME/gtksourceview.git && \
     cd gtksourceview && \
@@ -56,34 +44,12 @@ RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
 ENV PATH="/root/.cargo/bin:$PATH"
 
 # Point Cargo at the MinGW64 cross linker and the installed pkg-config paths
-RUN mkdir -p /root/.cargo && cat >> /root/.cargo/config.toml << 'TOML'
-[target.x86_64-pc-windows-gnu]
-linker = "x86_64-w64-mingw32-gcc"
-ar     = "x86_64-w64-mingw32-ar"
-
-[env]
-PKG_CONFIG_ALLOW_CROSS_x86_64_pc_windows_gnu  = "1"
-PKG_CONFIG_PATH_x86_64_pc_windows_gnu         = "/usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig"
-PKG_CONFIG_SYSROOT_DIR_x86_64_pc_windows_gnu  = "/usr/x86_64-w64-mingw32/sys-root/mingw"
-TOML
+RUN mkdir -p /root/.cargo
+COPY scripts/mingw64-cargo-config.toml /root/.cargo/config.toml
 
 WORKDIR /build
 
-RUN cat > /usr/local/bin/build-windows << 'SH'
-#!/bin/sh
-set -e
-
-cargo build --release --target x86_64-pc-windows-gnu
-mkdir -p /tmp/output/src
-cp target/x86_64-pc-windows-gnu/release/IDE_C--.exe /tmp/output/
-cp -r src/resources /tmp/output/src/
-cp /usr/x86_64-w64-mingw32/sys-root/mingw/bin/*.dll /tmp/output/
-cd /tmp/output
-mkdir -p /build/releases
-zip -r /build/releases/IDE_C--_windows_mingw.zip .
-echo "Done: releases/IDE_C--_windows_mingw.zip"
-SH
-
+COPY scripts/build-windows-mingw.sh /usr/local/bin/build-windows
 RUN chmod +x /usr/local/bin/build-windows
 
 CMD ["/usr/local/bin/build-windows"]

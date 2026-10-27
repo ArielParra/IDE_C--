@@ -1,7 +1,9 @@
+pub mod ast_view;
 pub mod layout;
 pub mod notebook;
-pub mod ast_view;
 
+pub use ast_view::AstView;
 pub use layout::Layout;
 pub use notebook::create_panels;
-pub use ast_view::AstView;
+
+pub mod symbols_view;
