@@ -41,7 +41,7 @@ class ReleaseVerification(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'libgtk-4-1.dll'):
                 release.verify_windows(archive)
             with zipfile.ZipFile(archive, 'a') as output:
-                output.writestr('libgtk-4-1.dll', pe(['api-ms-win-core-file-l1-1-0.dll']))
+                output.writestr('libgtk-4-1.dll', pe(['api-ms-win-core-file-l1-1-0.dll', 'winspool.drv']))
             release.verify_windows(archive)
 
     def test_windows_package_rejects_wrong_architecture_and_unsafe_paths(self):
